@@ -1,11 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { CoffeeBatch, Station } from '@/types';
 import { getDemoAssessment } from '@/constants/demoSamples';
 import { priceAssessment } from '@/services/pricing';
 import { supabase } from '@/services/supabaseClient';
 
-const STORAGE_KEYS = ['bunalens.station', 'bunalens.batches'] as const;
+function storageKeys(owner: string | null) {
+  const scope = owner ?? 'demo';
+  return ['bunalens.station.' + scope, 'bunalens.batches.' + scope] as const;
+}
+
+function readCache<T>(serialized: string | null | undefined): T | undefined {
+  try { return serialized ? JSON.parse(serialized) as T : undefined; }
+  catch { return undefined; }
+}
+
+function createDemoBatches(): CoffeeBatch[] {
+  const now = Date.now();
+  return [
+    { id: 'demo-seed-clean', batch_code: 'BNL-JMA-DEMO1', sample_type: 'green_bean', woreda: 'Gomma', created_at: new Date(now - 86400000).toISOString(), result: getDemoAssessment(false, 'green_bean'), lot_weight_kg: 170, status: 'demo', station_id: 'station-demo', pricing: priceAssessment('green_bean', 'Grade 1', 170), verification_id: 'demo-seed-clean' },
+    { id: 'demo-seed-defective', batch_code: 'BNL-JMA-DEMO2', sample_type: 'red_cherry', woreda: 'Limmu Kossa', created_at: new Date(now - 43200000).toISOString(), result: getDemoAssessment(true, 'red_cherry'), lot_weight_kg: 170, status: 'demo', station_id: 'station-demo', pricing: priceAssessment('red_cherry', 'Grade 3', 170), verification_id: 'demo-seed-defective' },
+  ];
+}
 const seed: Station = {
   id: 'station-demo',
   name: 'Gomma Coffee Washing Station',
@@ -18,7 +34,7 @@ const seed: Station = {
 interface StationContextValue {
   station: Station;
   batches: CoffeeBatch[];
-  setStation: (station: Station) => void;
+  setStation: (station: Station, owner?: string) => void;
   addBatch: (batch: CoffeeBatch) => void;
   addCredits: (amount: number) => void;
   consumeCredit: () => boolean;
@@ -27,71 +43,132 @@ interface StationContextValue {
 const StationContext = createContext<StationContextValue | null>(null);
 
 export function StationProvider({ children }: { children: React.ReactNode }) {
+  const [scope, setScope] = useState<string | null | undefined>(supabase ? undefined : null);
+  const currentScope = useRef(scope);
+  const [cacheReady, setCacheReady] = useState<string | null | undefined>(undefined);
   const [station, setStationState] = useState<Station>(seed);
   const [batches, setBatches] = useState<CoffeeBatch[]>([]);
 
   useEffect(() => {
-    let active = true;
-    AsyncStorage.multiGet([...STORAGE_KEYS])
-      .then(async (values) => {
-        if (!active) return;
-        const stationValue = values[0]?.[1];
-        const batchesValue = values[1]?.[1];
-        if (stationValue) {
-          try { setStationState(JSON.parse(stationValue) as Station); } catch { /* retain demo defaults */ }
-        }
-        if (batchesValue) {
-          try { setBatches(JSON.parse(batchesValue) as CoffeeBatch[]); } catch { /* retain empty history */ }
-        } else if (!stationValue || (() => { try { return (JSON.parse(stationValue) as Station).id === 'station-demo'; } catch { return true; } })()) {
-          // First-run sample records are explicitly marked DEMO and excluded from live AI metrics.
-          const now = Date.now();
-          const demoBatches: CoffeeBatch[] = [
-            { id: 'demo-seed-clean', batch_code: 'BNL-JMA-DEMO1', sample_type: 'green_bean', woreda: 'Gomma', created_at: new Date(now - 86400000).toISOString(), result: getDemoAssessment(false, 'green_bean'), lot_weight_kg: 170, status: 'demo', station_id: 'station-demo', pricing: priceAssessment('green_bean', 'Grade 1', 170), verification_id: 'demo-seed-clean' },
-            { id: 'demo-seed-defective', batch_code: 'BNL-JMA-DEMO2', sample_type: 'red_cherry', woreda: 'Limmu Kossa', created_at: new Date(now - 43200000).toISOString(), result: getDemoAssessment(true, 'red_cherry'), lot_weight_kg: 170, status: 'demo', station_id: 'station-demo', pricing: priceAssessment('red_cherry', 'Grade 3', 170), verification_id: 'demo-seed-defective' },
-          ];
-          setBatches(demoBatches);
-          await AsyncStorage.setItem(STORAGE_KEYS[1], JSON.stringify(demoBatches));
-        }
-      })
-      .then(async () => {
-        if (!active || !supabase) return;
-        const { data: sessionData } = await supabase.auth.getSession();
-        const user = sessionData.session?.user;
-        if (!user || !active) return;
-        const { data: remoteStation, error } = await supabase
-          .from('stations')
-          .select('id,name,manager,woreda,credits,pro_expires_at')
-          .eq('owner_id', user.id)
-          .limit(1)
-          .maybeSingle();
-        if (error || !remoteStation || !active) return;
-        const hydrated: Station = {
-          id: remoteStation.id,
-          name: remoteStation.name || 'My Coffee Station',
-          manager: remoteStation.manager || 'Station Manager',
-          woreda: remoteStation.woreda,
-          credits: remoteStation.credits,
-          feresula_price_etb: seed.feresula_price_etb,
-          pro_expires_at: remoteStation.pro_expires_at || undefined,
-        };
-        setStationState(hydrated);
-        await AsyncStorage.setItem(STORAGE_KEYS[0], JSON.stringify(hydrated));
-      })
-      .catch(() => undefined);
-    return () => { active = false; };
+    const client = supabase;
+    if (!client) return;
+    const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+      const nextScope = session?.user.id ?? null;
+      if (currentScope.current === nextScope) return;
+      currentScope.current = nextScope;
+      setCacheReady(undefined);
+      setStationState(seed);
+      setBatches([]);
+      setScope(nextScope);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const setStation = (next: Station) => {
-    setStationState(next);
-    void AsyncStorage.setItem(STORAGE_KEYS[0], JSON.stringify(next));
+  useEffect(() => {
+    if (scope === undefined) return;
+    let active = true;
+    const loadCache = async () => {
+      const keys = storageKeys(scope);
+      const values = await AsyncStorage.multiGet(keys);
+      const stationValue = values[0]?.[1];
+      const batchesValue = values[1]?.[1];
+      if (!active || currentScope.current !== scope) return;
+      const cachedStation = readCache<Station>(stationValue);
+      if (cachedStation) setStationState(current => current === seed ? cachedStation : current);
+      const cachedBatches = readCache<CoffeeBatch[]>(batchesValue);
+      const initial = cachedBatches ?? (scope === null ? createDemoBatches() : []);
+      setBatches(current => [...current, ...initial.filter(batch => !current.some(row => row.id === batch.id))]);
+    };
+    void loadCache().catch(() => undefined).finally(() => {
+      if (active && currentScope.current === scope) setCacheReady(scope);
+    });
+    return () => { active = false; };
+  }, [scope]);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !scope || cacheReady !== scope) return;
+    let active = true;
+    const loadStation = async () => {
+      const { data, error } = await client.from('stations')
+        .select('id,name,manager,woreda,credits,pro_expires_at')
+        .eq('owner_id', scope).limit(1).maybeSingle();
+      if (error || !data || !active || currentScope.current !== scope) return;
+      setStationState(current => ({
+        ...(current.id === data.id ? current : seed),
+        id: data.id,
+        name: data.name || 'My Coffee Station',
+        manager: data.manager || 'Station Manager',
+        woreda: data.woreda,
+        credits: data.credits,
+        pro_expires_at: data.pro_expires_at || undefined,
+      }));
+    };
+    void loadStation();
+    return () => { active = false; };
+  }, [scope, cacheReady]);
+
+  useEffect(() => {
+    if (scope === undefined || cacheReady !== scope || currentScope.current !== scope) return;
+    const [stationKey, batchesKey] = storageKeys(scope);
+    void AsyncStorage.multiSet([[stationKey, JSON.stringify(station)], [batchesKey, JSON.stringify(batches)]])
+      .catch(() => undefined);
+  }, [scope, cacheReady, station, batches]);
+
+  const stationId = station.id;
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !scope || cacheReady !== scope || stationId === seed.id) return;
+    let active = true;
+    let revision = 0;
+    const refreshCloudBatches = async () => {
+      const request = ++revision;
+      const { data: cloudRows, error } = await client.from('coffee_batches')
+        .select('id,batch_code,sample_type,woreda,created_at,image_path,gps_latitude,gps_longitude,latitude,longitude,lot_weight_kg,grading_result,pricing_result,verification_id,station_id,is_demo')
+        .eq('station_id', stationId).order('created_at', { ascending: false }).limit(500);
+      if (error || !cloudRows || !active || currentScope.current !== scope || request !== revision) return;
+      const cloudBatches: CoffeeBatch[] = cloudRows.map((row) => ({
+      id: row.id,
+      batch_code: row.batch_code,
+      sample_type: row.sample_type,
+      woreda: row.woreda,
+      created_at: row.created_at,
+      image_path: row.image_path || undefined,
+      origin_coordinates: (row.gps_latitude ?? row.latitude) != null && (row.gps_longitude ?? row.longitude) != null &&
+        Number.isFinite(Number(row.gps_latitude ?? row.latitude)) && Number.isFinite(Number(row.gps_longitude ?? row.longitude))
+        ? { latitude: Number(row.gps_latitude ?? row.latitude), longitude: Number(row.gps_longitude ?? row.longitude) }
+        : undefined,
+      result: row.grading_result,
+      lot_weight_kg: Number(row.lot_weight_kg),
+      status: row.is_demo ? 'demo' : 'synced',
+      station_id: row.station_id,
+      pricing: row.pricing_result || undefined,
+      verification_id: row.verification_id || undefined,
+    }));
+      const cloudIds = new Set(cloudBatches.map(batch => batch.id));
+      setBatches(current => [
+        ...cloudBatches,
+        ...current.filter(batch => batch.station_id === stationId && batch.status !== 'synced' && !cloudIds.has(batch.id)),
+      ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)));
+    };
+    void refreshCloudBatches().catch(() => undefined);
+    const channel = client.channel('coffee-batches-' + stationId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'coffee_batches', filter: 'station_id=eq.' + stationId },
+        () => { void refreshCloudBatches().catch(() => undefined); })
+      .subscribe();
+    return () => {
+      active = false;
+      void client.removeChannel(channel);
+    };
+  }, [scope, cacheReady, stationId]);
+
+  const setStation = (next: Station, owner = scope) => {
+    if (owner !== undefined && owner === currentScope.current) setStationState(next);
   };
 
   const addBatch = (batch: CoffeeBatch) => {
-    setBatches((current) => {
-      const next = [batch, ...current.filter((item) => item.id !== batch.id)];
-      void AsyncStorage.setItem(STORAGE_KEYS[1], JSON.stringify(next));
-      return next;
-    });
+    if (scope === undefined || scope !== currentScope.current || batch.station_id !== stationId) return;
+    setBatches(current => [batch, ...current.filter(item => item.id !== batch.id)]);
   };
 
   const addCredits = (amount: number) => {
@@ -107,7 +184,7 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({ station, batches, setStation, addBatch, addCredits, consumeCredit }),
-    [station, batches],
+    [station, batches, scope],
   );
 
   return <StationContext.Provider value={value}>{children}</StationContext.Provider>;

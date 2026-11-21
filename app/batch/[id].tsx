@@ -13,7 +13,6 @@ import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
-import CertificateCard from '@/components/CertificateCard';
 import LanguageToggle from '@/components/LanguageToggle';
 import { showAlert } from '@/services/platformAlert';
 import type { CoffeeBatch } from '@/types';
@@ -236,13 +235,11 @@ export default function Detail() {
       </View>
       <Text className="text-stone-400 text-[10px] mt-4 leading-4">{t('disclaimer')} This is a visual estimate only. It cannot establish moisture, cup quality, screen size, density or laboratory results.</Text>
 
-      <View className="items-center mt-6">
-        <Text className="text-espresso font-black text-lg mb-3">{t('certificate')}</Text>
-        <View ref={cert} collapsable={false}><CertificateCard batch={batch} /></View>
+      <View className="rounded-2xl border p-4 mt-6" style={{ backgroundColor: theme.colors.surface, borderColor: theme.colors.line }}>
+        <Text className="text-espresso font-black text-sm">BunaLens administrator certification</Text>
+        <Text className="text-stone-500 text-[11px] leading-5 mt-2">AI screening is preliminary only. The official BunaLens grade and quality classification are assigned by an authorized administrator after reviewing your sample.</Text>
+        <Pressable onPress={() => router.push('/certificates')} className="bg-espresso p-3.5 rounded-xl mt-3"><Text className="text-white font-bold text-center">View certification status and notifications</Text></Pressable>
       </View>
-      <Pressable onPress={shareImage} className="bg-cherry p-4 rounded-xl mt-5"><Text className="text-white font-bold text-center">{t('exportImage')}</Text></Pressable>
-      <Pressable onPress={saveImage} className="bg-emerald p-4 rounded-xl mt-2"><Text className="text-white font-bold text-center">{t('saveCertificate')}</Text></Pressable>
-      <Pressable onPress={sharePdf} className="bg-espresso p-4 rounded-xl mt-2"><Text className="text-white font-bold text-center">{t('exportPdf')}</Text></Pressable>
     </ScrollView>
   );
 }

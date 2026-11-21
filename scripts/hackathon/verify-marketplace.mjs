@@ -33,12 +33,27 @@ const buyer = await ensureUser(stack, 'demo-buyer@bunalens.test', 'BUNALENS_DEMO
 const buyerB = await ensureUser(stack, 'demo-buyer-b@bunalens.test', 'BUNALENS_DEMO_BUYER_B_PASSWORD');
 
 const CLEAN = { sound_or_ripe_pct: 96, unripe_green_pct: 1, black_overfermented_pct: 1, insect_broken_pct: 1, foreign_matter_pct: 1 };
-// Registers a lot, attaches a demo-fixture screening and SIMULATED readings, and applies the rules.
+// Registers a lot, seeds synthetic local evidence and gets administrator certification.
 const eligibleLot = async (seller, key, stage, woreda, kg, moisture = 11.0) => {
   const lot = (await rpc(stack, 'bunalens_register_lot', { p_idempotency_key: key, p_sample_type: stage, p_woreda: woreda, p_lot_weight_kg: kg, p_farmer_name: 'DEMO farmer (not a real person)' }, { token: seller.token })).json.lot;
   const result = { is_coffee_sample: true, ecx_grade: 'Unclassified', quality_score: 96, confidence_score: 95, breakdown: CLEAN, estimated_price_per_feresula_etb: 0, potential_gain_if_sorted_etb: 0, export_readiness: 'Commercial Export', sorting_action_advice: 'Demonstration only.', assessment_limitations: ['Simulated demonstration data; no photograph was analyzed.'], assessment_method: 'ai_visual_estimate' };
-  const assessment = { ...result, screening: buildScreening(result, stage, { source: 'demo_fixture', provider: 'bunalens-demo-fixture', model: 'none', assessedAt: new Date().toISOString() }) };
-  await rpc(stack, 'bunalens_attach_demo_assessment', { p_batch_id: lot.id, p_capture_key: 'p6-' + run + '-' + crypto.randomBytes(3).toString('hex'), p_assessment: assessment, p_image_path: null }, { token: seller.token });
+  if (!stack.service) throw new Error('Set the service role for the local test stack.');
+  const photo = lot.station_id + '/server-captures/fixture-' + crypto.randomUUID() + '.png';
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const stored = await fetch(stack.url + '/storage/v1/object/coffee-samples/' + photo, {
+    method: 'POST', headers: { apikey: stack.service, Authorization: 'Bearer ' + stack.service, 'Content-Type': 'image/png' }, body: png,
+  });
+  if (!stored.ok) throw new Error('Could not upload local certification test photo (' + stored.status + ').');
+  // Synthetic live-shaped evidence for the local certification transaction. No AI call or real photograph.
+  const assessment = { ...result, screening: buildScreening(result, stage, { source: 'live_inference', provider: 'local-test-fixture', model: 'none', assessedAt: new Date().toISOString() }) };
+  const seeded = await api(stack, 'PATCH', '/rest/v1/coffee_batches?id=eq.' + encodeURIComponent(lot.id), {
+    key: stack.service, token: stack.service, body: {
+      grading_result: assessment, image_path: photo, grading_status: 'completed', is_demo: false, ecx_grade: 'Unclassified',
+      certification_status: 'pending_admin_review', certified_grade: null, quality_classification: null,
+      certification_origin_zone: null, certified_by: null, certified_at: null, certification_note: null,
+    },
+  });
+  if (seeded.status !== 204) throw new Error('Could not seed the local certification fixture (' + seeded.status + ').');
   const reading = (kind, value, unit, method) => rpc(stack, 'bunalens_record_lot_evidence', { p_batch_id: lot.id, p_kind: kind, p_value: value, p_unit: unit, p_method: method, p_source: 'simulated', p_recorded_at: new Date().toISOString(), p_note: 'SIMULATED reading for the demo; no instrument was used.' }, { token: seller.token });
   if (stage === 'green_bean') {
     await reading('defect_pct', 3.5, '% by weight', 'hand_sort_weighed_sample');
@@ -48,6 +63,11 @@ const eligibleLot = async (seller, key, stage, woreda, kg, moisture = 11.0) => {
     await reading('defect_pct', 4, '% by count', 'hand_count_sample');
   }
   const evaluated = await rpc(stack, 'bunalens_evaluate_lot_eligibility', { p_batch_id: lot.id }, { token: seller.token });
+  const certification = await rpc(stack, 'bunalens_admin_certify_reviewed_scan', {
+    p_batch_id: lot.id, p_image_path: photo, p_decision: 'eligible', p_reason: 'Private local certification fixture audit note.',
+    p_price_per_kg_etb: null, p_certified_grade: 'Grade 2', p_quality_classification: 'Local Market Only',
+  }, { token: admin.token });
+  if (certification.status !== 200) throw new Error('Local administrator could not certify the fixture: ' + certification.json?.message);
   return { ...lot, eligibility: evaluated.json?.eligibility_status };
 };
 const save = (seller, lotId, kg, price, status) => rpc(stack, 'bunalens_save_listing', { p_batch_id: lotId, p_available_kg: kg, p_price_per_kg_etb: price, p_status: status }, { token: seller.token });
@@ -73,7 +93,7 @@ check('three demo lots are eligible', [lotA, lotCherry, lotMana].every((l) => l.
 check('another seller cannot list this lot', (await save(sellerB, lotA.id, 100, 450, 'draft')).status === 403);
 check('a buyer without a station cannot list a lot', (await save(buyer, lotA.id, 100, 450, 'draft')).status === 403);
 const failPublish = await save(sellerA, failLot.id, 100, 450, 'published');
-check('a failed lot cannot be published through the seller function', failPublish.status === 403 && failPublish.json?.message === 'Lot is not eligible for listing', failPublish.json?.message);
+check('a failed lot cannot be published through the seller function', failPublish.status === 403 && failPublish.json?.message?.includes('must be certified'), failPublish.json?.message);
 check('more kilograms than the lot holds are refused', (await save(sellerA, lotA.id, 601, 450, 'draft')).status === 400);
 check('a zero or negative price is refused', (await save(sellerA, lotA.id, 100, 0, 'draft')).status === 400 && (await save(sellerA, lotA.id, 100, -5, 'draft')).status === 400);
 const draft = await save(sellerA, lotCherry.id, 800, 38, 'draft');
@@ -89,12 +109,12 @@ const ids = [pubA.json.id, pubCherry.json.id, pubMana.json.id];
 // ---- Public browse -----------------------------------------------------------
 const row = await listingRow(pubA.json.id);
 const allowed = ['id', 'batch_id', 'station_id', 'seller_display_name', 'origin_woreda', 'coffee_stage', 'available_kg', 'price_per_kg_etb', 'screening_summary', 'assessed_at', 'is_demo', 'status', 'published_at', 'created_at', 'updated_at', 'batch_code', 'evidence_summary'];
-check('public listing has the buyer fields', row && row.batch_id === lotA.id && row.batch_code === lotA.batch_code && row.seller_display_name === 'DEMO Gomma Washing Station' && row.origin_woreda === 'Gomma' && row.coffee_stage === 'green_bean' && Number(row.available_kg) === kgA && Number(row.price_per_kg_etb) === 450 && row.screening_summary.startsWith('DEMO FIXTURE') && Boolean(row.assessed_at) && row.is_demo === true);
+check('public listing has the buyer fields', row && row.batch_id === lotA.id && row.batch_code === lotA.batch_code && row.seller_display_name === 'DEMO Gomma Washing Station' && row.origin_woreda === 'Gomma' && row.coffee_stage === 'green_bean' && Number(row.available_kg) === kgA && Number(row.price_per_kg_etb) === 450 && row.screening_summary.includes('BunaLens administrator-certified') && Boolean(row.assessed_at) && row.is_demo === true);
 check('public listing has no field outside the buyer set', Object.keys(row).every((k) => allowed.includes(k)), Object.keys(row).filter((k) => !allowed.includes(k)).join(','));
 const text = JSON.stringify(row);
-check('public listing carries no credential, contact, reviewer, note or photo path', !/token|password|phone|farmer|reviewer|recorded_by|note"|image_path|capture_key|evidence_id|owner/i.test(text.replace(/not_assessed/g, '')));
+check('public listing carries no credential, contact, reviewer, note or photo path', !/"(?:[^"]*(?:token|password|phone|farmer)|reviewer_id|recorded_by|[^"]*note|image_path|capture_key|evidence_id|owner_id|approval_reason)"\s*:/i.test(text));
 const ev = row.evidence_summary;
-check('evidence provenance: policy, decision, source and method per input', ev.policy_id === 'demo-policy-2026-11-21' && ev.policy_is_demo === true && ev.eligibility_status === 'eligible' && ev.decided_by === 'rule' && ev.uses_simulated_evidence === true && ev.official_grade === 'Unclassified' && ev.inputs.length === 4 && ev.inputs.every((i) => i.source === 'simulated' && i.method) && ev.screening.source === 'demo_fixture');
+check('evidence provenance: policy, decision, source and method per input', ev.policy_id === 'demo-policy-2026-11-21' && ev.policy_is_demo === true && ev.eligibility_status === 'eligible' && ev.decided_by === 'reviewer' && ev.uses_simulated_evidence === true && ev.official_grade === 'Grade 2' && ev.inputs.length === 4 && ev.inputs.every((i) => i.source === 'simulated' && i.method) && ev.screening.source === 'live_inference');
 const inRun = (rows) => rows.filter((r) => ids.includes(r.id)).map((r) => r.id);
 check('filter by origin', JSON.stringify(inRun(await browse('&origin_woreda=eq.Mana'))) === JSON.stringify([pubMana.json.id]));
 check('filter by stage', JSON.stringify(inRun(await browse('&coffee_stage=eq.red_cherry'))) === JSON.stringify([pubCherry.json.id]));

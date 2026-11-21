@@ -25,7 +25,7 @@ export default function Batches() {
   const [woreda, setWoreda] = useState('all');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [newestFirst, setNewestFirst] = useState(true);
-  const grades: EcxGrade[] = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Undergrade', 'Unclassified'];
+  const grades: EcxGrade[] = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Undergrade', 'Unclassified'];
   const woredas = useMemo(() => [...new Set(batches.map((b) => b.woreda))].sort(), [batches]);
   const rows = useMemo(() => batches.filter((batch) => {
     const matchesQuery = (batch.batch_code + ' ' + batch.woreda).toLowerCase().includes(q.trim().toLowerCase());

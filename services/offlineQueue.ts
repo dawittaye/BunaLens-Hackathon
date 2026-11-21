@@ -25,10 +25,10 @@ export interface QueuedCapture {
   mime_type?: string;
 }
 
-export async function getQueue(): Promise<QueuedCapture[]> {
+export async function getQueue(stationId?: string): Promise<QueuedCapture[]> {
   try {
     const parsed: unknown = JSON.parse((await AsyncStorage.getItem(KEY)) || '[]');
-    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item.id === 'string' && typeof item.image_uri === 'string') as QueuedCapture[] : [];
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item.id === 'string' && typeof item.image_uri === 'string' && (stationId === undefined || (item.station_id ?? 'station-demo') === stationId)) as QueuedCapture[] : [];
   } catch { return []; }
 }
 
@@ -76,16 +76,17 @@ export async function isOnline() {
   return Boolean(state.isConnected && state.isInternetReachable !== false);
 }
 
-export async function syncQueuedCaptures(): Promise<{ synced: CoffeeBatch[]; remaining: number }> {
-  if (syncInProgress) return { synced: [], remaining: (await getQueue()).length };
+export async function syncQueuedCaptures(stationId: string): Promise<{ synced: CoffeeBatch[]; remaining: number }> {
+  if (syncInProgress) return { synced: [], remaining: (await getQueue(stationId)).length };
   syncInProgress = true;
   try {
+    if (stationId === 'station-demo') throw new Error('Sign in to a registered station before synchronizing queued captures.');
     if (!endpoint) throw new Error('Offline sync is not configured. Set EXPO_PUBLIC_BUNALENS_SYNC_URL to the coffee-sync Edge Function URL.');
     const token = await getSupabaseAccessToken();
     const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
     if (!token || !anonKey) throw new Error('Sign in to a registered station before synchronizing queued captures.');
     if (!(await isOnline())) throw new Error('No internet connection.');
-    const queue = await getQueue();
+    const queue = await getQueue(stationId);
     const synced: CoffeeBatch[] = [];
     for (const item of queue) {
       try {
@@ -117,16 +118,7 @@ export async function syncQueuedCaptures(): Promise<{ synced: CoffeeBatch[]; rem
         if (!result.is_coffee_sample) break;
         const permanentImage = await persistLocalImage(item.image_uri, item.id, item.mime_type || 'image/jpeg').catch(() => null);
         const completedBatch: CoffeeBatch = { ...batch, result, image_uri: permanentImage || item.image_uri, status: 'synced' };
-        // Persist the completed record before acknowledging/removing the queue item.
-        // If the app is terminated between server response and context update, the
-        // station provider can still recover this batch after the next launch.
-        try {
-          const stored = JSON.parse((await AsyncStorage.getItem('bunalens.batches')) || '[]') as CoffeeBatch[];
-          const merged = [completedBatch, ...stored.filter((saved) => saved.id !== completedBatch.id)];
-          await AsyncStorage.setItem('bunalens.batches', JSON.stringify(merged));
-        } catch {
-          break;
-        }
+        // The authenticated station reloads the authoritative record after a restart.
         synced.push(completedBatch);
         const latest = await getQueue();
         await saveQueue(latest.filter((queued) => queued.id !== item.id));

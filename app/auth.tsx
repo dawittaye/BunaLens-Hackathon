@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Eye, EyeOff, Mail } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { JIMMA_WOREDAS } from '@/constants/jimmaData';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -27,18 +38,22 @@ export default function AuthScreen() {
   const [woreda, setWoreda] = useState(station.woreda);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState('');
 
   const connect = async () => {
     if (!supabase) {
-      showAlert(t('cloudUnavailable'), t('cloudUnavailableHint'));
+      setFeedback(t('cloudUnavailableHint'));
       return;
     }
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !normalizedEmail.includes('@') || password.length < 8) {
-      showAlert(t('checkCredentials'), t('checkCredentials'));
+      setFeedback(t('checkCredentials'));
       return;
     }
 
+    setFeedback('');
     setBusy(true);
     try {
       const result = mode === 'signin'
@@ -52,19 +67,19 @@ export default function AuthScreen() {
       if (result.error) {
         const authError = result.error as AuthErrorLike;
         if (authError.code === 'email_not_confirmed') {
-          showAlert(t('confirmEmail'), t('accountCreated'));
+          setFeedback(t('accountCreated'));
           return;
         }
         if (authError.code === 'invalid_credentials') {
-          showAlert(t('checkCredentials'), t('checkCredentials'));
+          setFeedback(t('checkCredentials'));
           return;
         }
         if (authError.code === 'user_already_exists') {
-          showAlert(t('accountError'), t('signIn'));
+          setFeedback(t('signIn'));
           return;
         }
         if (authError.code === 'over_email_send_rate_limit' || authError.status === 429) {
-          showAlert(t('accountError'), t('confirmEmail'));
+          setFeedback(t('confirmEmail'));
           return;
         }
         throw result.error;
@@ -73,7 +88,7 @@ export default function AuthScreen() {
       const user = result.data.user;
       const session = result.data.session;
       if (!user || !session) {
-        showAlert(t('confirmEmail'), t('accountCreated'));
+        setFeedback(t('accountCreated'));
         return;
       }
 
@@ -128,7 +143,7 @@ export default function AuthScreen() {
         credits: record.credits,
         feresula_price_etb: station.feresula_price_etb,
         pro_expires_at: record.pro_expires_at || undefined,
-      });
+      }, user.id);
       await assignQueuedStation(record.id);
       await refreshQueue();
       showAlert(t('stationConnected'), t('stationReady'));
@@ -137,7 +152,7 @@ export default function AuthScreen() {
       const code = (error as AuthErrorLike | null)?.code;
       // Keep provider and database diagnostics out of the user-facing interface.
       console.warn('BunaLens account operation failed', code ? { code } : undefined);
-      showAlert(t('accountError'), t('accountError'));
+      setFeedback(t('accountError'));
     } finally {
       setBusy(false);
     }
@@ -151,76 +166,229 @@ export default function AuthScreen() {
       showAlert(t('accountError'), t('accountError'));
       return;
     }
-    setStation({ ...station, id: 'station-demo', credits: 10, pro_expires_at: undefined });
     showAlert(t('signOut'), t('accountDemo'));
   };
 
+  const fieldBorder = (field: string) =>
+    focusedField === field ? theme.colors.emerald : '#E5E7EB';
+
+  const inputStyle = (field: string) => ({
+    height: 50,
+    borderWidth: 1,
+    borderColor: fieldBorder(field),
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    color: '#111827',
+    fontSize: 16,
+  } as const);
+
+  const labelStyle = {
+    color: '#374151',
+    fontSize: 13,
+    fontWeight: '700' as const,
+    marginBottom: 8,
+  };
+
   return (
-    <ScrollView className="flex-1 p-6" style={{ backgroundColor: theme.colors.parchment }}>
-      <View className="flex-row justify-between items-center mt-8">
-        <View className="flex-row items-center"><BunaLogo size={54} /><View className="ml-3"><Text className="text-xl font-black" style={{ color: theme.colors.espresso }}>BunaLens</Text><Text className="text-xs" style={{ color: theme.colors.secondary }}>{t('coffeeIntelligence')}</Text></View></View>
-        <LanguageToggle />
-      </View>
-      <Text className="text-3xl font-black mt-6" style={{ color: theme.colors.espresso }}>{t('accountTitle')}</Text>
-      <Text className="mt-2" style={{ color: theme.colors.secondary }}>{t('accountHint')}</Text>
-      {!isSupabaseConfigured ? (
-        <View className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-5">
-          <Text className="text-amber-900 text-sm">{t('cloudUnavailableHint')}</Text>
-        </View>
-      ) : null}
-      <View className="rounded-2xl p-4 mt-6 border" style={{ backgroundColor: theme.colors.surface, borderColor: theme.colors.line }}>
-        <View className="flex-row gap-2">
-          <Pressable onPress={() => setMode('signin')} className={`flex-1 p-3 rounded-lg ${mode === 'signin' ? 'bg-espresso' : 'bg-parchment'}`}>
-            <Text className={mode === 'signin' ? 'text-white text-center font-bold' : 'text-espresso text-center'}>{t('signIn')}</Text>
-          </Pressable>
-          <Pressable onPress={() => setMode('signup')} className={`flex-1 p-3 rounded-lg ${mode === 'signup' ? 'bg-espresso' : 'bg-parchment'}`}>
-            <Text className={mode === 'signup' ? 'text-white text-center font-bold' : 'text-espresso text-center'}>{t('createAccount')}</Text>
-          </Pressable>
-        </View>
-
-        <Text className="text-espresso font-bold mt-5">{t('email')}</Text>
-        <TextInput value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" placeholder="you@example.com" className="border border-line rounded-xl p-3 mt-2 text-espresso" />
-        <Text className="text-espresso font-bold mt-4">{t('password')}</Text>
-        <TextInput value={password} onChangeText={setPassword} secureTextEntry autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} placeholder="At least 8 characters" className="border border-line rounded-xl p-3 mt-2 text-espresso" />
-        {mode === 'signin' ? (
-          <View className="items-end mt-2">
-            <Text
-              accessibilityRole="link"
-              onPress={() => router.push('/forgot-password')}
-              className="text-cherry underline font-semibold py-1"
-            >
-              Forgot password?
-            </Text>
-          </View>
-        ) : null}
-
-        {mode === 'signup' ? (
-          <>
-            <Text className="text-espresso font-bold mt-4">{t('stationName')}</Text>
-            <TextInput value={name} onChangeText={setName} className="border border-line rounded-xl p-3 mt-2 text-espresso" />
-            <Text className="text-espresso font-bold mt-4">{t('manager')}</Text>
-            <TextInput value={manager} onChangeText={setManager} className="border border-line rounded-xl p-3 mt-2 text-espresso" />
-            <Text className="text-espresso font-bold mt-4">{t('stationWoreda')}</Text>
-            <View className="flex-row flex-wrap mt-2">
-              {JIMMA_WOREDAS.map((item) => (
-                <Pressable key={item} onPress={() => setWoreda(item)} className={`p-2 m-1 rounded-full ${item === woreda ? 'bg-espresso' : 'bg-parchment'}`}>
-                  <Text className={item === woreda ? 'text-white' : 'text-espresso'}>{item}</Text>
-                </Pressable>
-              ))}
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ width: '100%', maxWidth: 480, alignSelf: 'center', flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 34 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <BunaLogo size={42} />
+                <View style={{ marginLeft: 10 }}>
+                  <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900', letterSpacing: -0.4 }}>BunaLens</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 1 }}>{t('coffeeIntelligence')}</Text>
+                </View>
+              </View>
+              <LanguageToggle />
             </View>
-          </>
-        ) : null}
 
-        <Pressable disabled={busy || !isSupabaseConfigured} onPress={connect} className="bg-cherry p-4 rounded-xl mt-6">
-          {busy ? <ActivityIndicator color="white" /> : <Text className="text-white text-center font-bold">{mode === 'signin' ? t('signInConnect') : t('createAccountStation')}</Text>}
-        </Pressable>
-        <Pressable onPress={signOut} className="p-3 mt-2">
-          <Text className="text-stone-500 text-center">{t('signOut')}</Text>
-        </Pressable>
-      </View>
-      <Pressable accessibilityRole="link" onPress={() => router.push('/admin-login')} className="self-center py-4 px-3">
-        <Text style={{ color: theme.colors.emerald, fontSize: 12, fontWeight: '800' }}>BunaLens administrator? Open admin sign in</Text>
-      </Pressable>
-    </ScrollView>
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ color: '#111827', fontSize: 27, lineHeight: 33, fontWeight: '800', letterSpacing: -0.7 }}>
+                {t('accountTitle')}
+              </Text>
+              <Text style={{ color: '#6B7280', fontSize: 14, lineHeight: 21, marginTop: 7 }}>
+                {t('accountHint')}
+              </Text>
+            </View>
+
+            {!isSupabaseConfigured ? (
+              <View style={{ backgroundColor: '#FFFBEB', borderColor: '#FDE68A', borderWidth: 1, borderRadius: 12, padding: 13, marginBottom: 18 }}>
+                <Text style={{ color: '#92400E', fontSize: 13, lineHeight: 19 }}>{t('cloudUnavailableHint')}</Text>
+              </View>
+            ) : null}
+
+            <View style={{ backgroundColor: '#FFFFFF', borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 22, padding: 20, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 2 }}>
+              <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 12, padding: 4, marginBottom: 22 }}>
+                <Pressable
+                  onPress={() => { setMode('signin'); setFeedback(''); }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: mode === 'signin' }}
+                  style={{ flex: 1, minHeight: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === 'signin' ? '#FFFFFF' : 'transparent', shadowColor: '#111827', shadowOpacity: mode === 'signin' ? 0.08 : 0, shadowRadius: 5, elevation: mode === 'signin' ? 1 : 0 }}
+                >
+                  <Text style={{ color: mode === 'signin' ? '#111827' : '#6B7280', fontSize: 14, fontWeight: '700' }}>{t('signIn')}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { setMode('signup'); setFeedback(''); }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: mode === 'signup' }}
+                  style={{ flex: 1, minHeight: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === 'signup' ? '#FFFFFF' : 'transparent', shadowColor: '#111827', shadowOpacity: mode === 'signup' ? 0.08 : 0, shadowRadius: 5, elevation: mode === 'signup' ? 1 : 0 }}
+                >
+                  <Text style={{ color: mode === 'signup' ? '#111827' : '#6B7280', fontSize: 14, fontWeight: '700' }}>{t('createAccount')}</Text>
+                </Pressable>
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={labelStyle}>{t('email')}</Text>
+                <View style={{ height: 50, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: fieldBorder('email'), borderRadius: 12, backgroundColor: '#FFFFFF', paddingLeft: 13 }}>
+                  <Mail size={17} color="#9CA3AF" />
+                  <TextInput
+                    value={email}
+                    onChangeText={(value) => { setEmail(value); setFeedback(''); }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    placeholderTextColor="#9CA3AF"
+                    editable={!busy}
+                    onFocus={() => setFocusedField('email')}
+                    onBlur={() => setFocusedField(null)}
+                    returnKeyType="next"
+                    style={{ flex: 1, height: 50, paddingHorizontal: 11, color: '#111827', fontSize: 16 }}
+                  />
+                </View>
+              </View>
+
+              <View style={{ marginBottom: mode === 'signup' ? 16 : 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={labelStyle}>{t('password')}</Text>
+                  {mode === 'signin' ? (
+                    <Text
+                      accessibilityRole="link"
+                      onPress={() => router.push('/forgot-password')}
+                      style={{ color: theme.colors.emerald, fontSize: 12, fontWeight: '700', paddingVertical: 2 }}
+                    >
+                      Forgot password?
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={{ height: 50, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: fieldBorder('password'), borderRadius: 12, backgroundColor: '#FFFFFF', paddingLeft: 14 }}>
+                  <TextInput
+                    value={password}
+                    onChangeText={(value) => { setPassword(value); setFeedback(''); }}
+                    secureTextEntry={!showPassword}
+                    autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                    placeholder="At least 8 characters"
+                    placeholderTextColor="#9CA3AF"
+                    editable={!busy}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
+                    onSubmitEditing={connect}
+                    returnKeyType="done"
+                    style={{ flex: 1, height: 50, color: '#111827', fontSize: 16, paddingRight: 8 }}
+                  />
+                  <Pressable
+                    onPress={() => setShowPassword((visible) => !visible)}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    hitSlop={10}
+                    style={{ width: 46, height: 48, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    {showPassword ? <EyeOff size={19} color="#6B7280" /> : <Eye size={19} color="#6B7280" />}
+                  </Pressable>
+                </View>
+              </View>
+
+              {mode === 'signup' ? (
+                <>
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={labelStyle}>{t('stationName')}</Text>
+                    <TextInput
+                      value={name}
+                      onChangeText={setName}
+                      editable={!busy}
+                      onFocus={() => setFocusedField('stationName')}
+                      onBlur={() => setFocusedField(null)}
+                      style={inputStyle('stationName')}
+                    />
+                  </View>
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={labelStyle}>{t('manager')}</Text>
+                    <TextInput
+                      value={manager}
+                      onChangeText={setManager}
+                      editable={!busy}
+                      onFocus={() => setFocusedField('manager')}
+                      onBlur={() => setFocusedField(null)}
+                      style={inputStyle('manager')}
+                    />
+                  </View>
+                  <View style={{ marginBottom: 8 }}>
+                    <Text style={labelStyle}>{t('stationWoreda')}</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 }}>
+                      {JIMMA_WOREDAS.map((item) => {
+                        const selected = item === woreda;
+                        return (
+                          <Pressable
+                            key={item}
+                            onPress={() => setWoreda(item)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
+                            style={{ paddingHorizontal: 13, paddingVertical: 9, margin: 4, borderRadius: 20, borderWidth: 1, borderColor: selected ? theme.colors.emerald : '#E5E7EB', backgroundColor: selected ? theme.colors.emerald : '#FFFFFF' }}
+                          >
+                            <Text style={{ color: selected ? '#FFFFFF' : '#4B5563', fontSize: 13, fontWeight: selected ? '700' : '500' }}>{item}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </>
+              ) : null}
+
+              {feedback ? (
+                <View accessibilityRole="alert" style={{ backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, marginTop: 12 }}>
+                  <Text style={{ color: '#DC2626', fontSize: 13, lineHeight: 18 }}>{feedback}</Text>
+                </View>
+              ) : null}
+
+              <Pressable
+                disabled={busy || !isSupabaseConfigured}
+                onPress={connect}
+                accessibilityRole="button"
+                style={{ backgroundColor: theme.colors.cherry, minHeight: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 20, opacity: busy || !isSupabaseConfigured ? 0.58 : 1 }}
+              >
+                {busy ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={{ color: '#FFFFFF', textAlign: 'center', fontSize: 15, fontWeight: '800' }}>
+                    {mode === 'signin' ? t('signInConnect') : t('createAccountStation')}
+                  </Text>
+                )}
+              </Pressable>
+
+              <Pressable onPress={signOut} disabled={busy} style={{ alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 12, marginTop: 5 }}>
+                <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600' }}>{t('signOut')}</Text>
+              </Pressable>
+            </View>
+
+            <Pressable accessibilityRole="link" onPress={() => router.push('/admin-login')} style={{ alignSelf: 'center', paddingVertical: 20, paddingHorizontal: 10 }}>
+              <Text style={{ color: theme.colors.emerald, fontSize: 12, fontWeight: '800' }}>BunaLens administrator? Open admin sign in</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

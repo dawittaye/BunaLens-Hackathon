@@ -34,3 +34,6 @@ ml/artifacts/
 
 # Hackathon sprint: local payment-check state (ids only)
 .order-payment-check.json
+
+# Local Supabase CLI state
+supabase/.temp/

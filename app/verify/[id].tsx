@@ -6,7 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useStation } from '@/contexts/StationContext';
 import type { CoffeeBatch } from '@/types';
 
-const VERIFY_BASE = process.env.EXPO_PUBLIC_CERTIFICATE_VERIFY_BASE_URL;
+const VERIFY_BASE = process.env.EXPO_PUBLIC_CERTIFICATE_VERIFY_BASE_URL || (process.env.EXPO_PUBLIC_SUPABASE_URL ? process.env.EXPO_PUBLIC_SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/certificate-verify' : undefined);
 
 type VerificationStatus = 'loading' | 'verified' | 'demo' | 'local' | 'invalid' | 'offline' | 'unavailable';
 type RemoteCertificate = {
@@ -16,7 +16,10 @@ type RemoteCertificate = {
   origin_woreda: string;
   assessed_at: string;
   lot_weight_kg: number;
-  estimated_grade: string | null;
+  certified_grade: string | null;
+  quality_classification: string | null;
+  origin_zone: string | null;
+  certified_at: string | null;
   quality_score: number | null;
   disclaimer: string;
 };
@@ -78,8 +81,10 @@ export default function VerifyCertificate() {
   const batchCode = remote?.batch_code || localBatch?.batch_code;
   const sample = remote?.sample_type || localBatch?.sample_type;
   const woreda = remote?.origin_woreda || localBatch?.woreda;
-  const grade = remote?.estimated_grade || localBatch?.result.ecx_grade;
-  const score = remote?.quality_score ?? localBatch?.result.quality_score;
+  const grade = remote?.certified_grade;
+  const classification = remote?.quality_classification;
+  const originZone = remote?.origin_zone;
+  const score = remote?.quality_score;
 
   return (
     <ScrollView className="flex-1 bg-parchment" contentContainerStyle={{ padding: 22, paddingTop: 54, paddingBottom: 40 }}>
@@ -111,9 +116,11 @@ export default function VerifyCertificate() {
           <View className="w-full border-t border-stone-100 mt-5 pt-4">
             <Text className="text-stone-500 text-[10px] font-bold">{om ? 'LAKKOOFSA BAACHII' : 'BATCH CODE'}</Text>
             <Text className="text-espresso text-lg font-black mt-1">{batchCode}</Text>
-            <Text className="text-stone-600 text-xs mt-2">{sample === 'red_cherry' ? (om ? 'Buna diimaa' : 'Red cherry') : (om ? 'Buna qullaa' : 'Green bean')} · {woreda}</Text>
-            <Text className="text-espresso font-bold mt-3">{om ? 'Ramaddii suuraa' : 'Visual category'}: {grade || '—'}</Text>
-            <Text className="text-espresso font-bold mt-1">{om ? 'Qabxii qulqullinaa' : 'Visual quality score'}: {score === null || score === undefined ? '—' : score + '/100'}</Text>
+            <Text className="text-stone-600 text-xs mt-2">{sample === 'red_cherry' ? (om ? 'Buna diimaa' : 'Red cherry') : (om ? 'Buna qullaa' : 'Green bean')} · {originZone || 'Jimma'} Zone · {woreda}</Text>
+            <Text className="text-espresso font-bold mt-3">{om ? 'Sadarkaa' : 'Administrator-certified grade'}: {grade || '—'}</Text>
+            <Text className="text-espresso font-bold mt-1">{om ? 'Ramaddii qulqullinaa' : 'Quality classification'}: {classification || '—'}</Text>
+            <Text className="text-espresso font-bold mt-1">{om ? 'Qabxii madaallii' : 'AI visual quality score'}: {score === null || score === undefined ? '—' : score + '/100'}</Text>
+            {remote?.certified_at ? <Text className="text-stone-500 text-[10px] mt-2">Certified: {new Date(remote.certified_at).toLocaleString()}</Text> : null}
           </View>
         ) : null}
         {status === 'demo' || status === 'verified' ? (

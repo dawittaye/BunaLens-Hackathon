@@ -63,7 +63,7 @@ export default function LotListingCard({ batchId, lotWeightKg }: { batchId: stri
         <Text testID="lot-listing-orders" onPress={() => router.push('/market/orders')} style={{ color: '#7C2D12', fontWeight: '800', fontSize: 12, marginRight: 16 }}>Incoming orders ›</Text>
         <Text onPress={() => router.push('/(tabs)/marketplace')} style={{ color: '#7C2D12', fontWeight: '800', fontSize: 12 }}>Marketplace ›</Text>
       </View>
-      <Text style={{ fontSize: 10, lineHeight: 15, color: '#78716C', marginTop: 8 }}>Publishing works only for an eligible lot of an approved seller with stock. The server checks this again when you publish.</Text>
+      <Text style={{ fontSize: 10, lineHeight: 15, color: '#78716C', marginTop: 8 }}>Publishing requires an administrator-certified lot, an approved seller account and available stock. Drafts may be saved before certification; the server enforces certification before public release.</Text>
     </View>
   );
 }

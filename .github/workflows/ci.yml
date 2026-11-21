@@ -42,3 +42,4 @@ jobs:
           deno check supabase/functions/chapa-webhook/index.ts
           deno check supabase/functions/certificate-verify/index.ts
           deno check supabase/functions/admin-users/index.ts
+          deno check supabase/functions/chapa-order-payment/index.ts

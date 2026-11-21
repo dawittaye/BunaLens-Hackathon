@@ -90,6 +90,7 @@ function AppShell() {
             >
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="admin/index" />
+              <Stack.Screen name="admin/coffee-plants" />
               <Stack.Screen name="admin-login" />
               <Stack.Screen name="batch/[id]" />
               <Stack.Screen name="auth" />

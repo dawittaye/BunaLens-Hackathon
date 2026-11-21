@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, View, Text, Pressable, ActivityIndicator, Alert, TextInput, Image, Modal, Platform } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { attachDemoAssessment, fetchCloudLot } from '@/services/lots';
 import { Camera, ImagePlus, ScanLine, Coffee, MapPin, Scale, Info, ShieldCheck, Zap, RotateCcw, ChevronRight } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -36,6 +37,23 @@ export default function Scan() {
   const [flash, setFlash] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [demoOpen, setDemoOpen] = useState(false);
+  // Sprint addition: when opened from a registered lot, the photo is saved on that lot.
+  const { lotId } = useLocalSearchParams<{ lotId?: string }>();
+  const [lot, setLot] = useState<CoffeeBatch | null>(null);
+  useEffect(() => {
+    let active = true;
+    setLot(null);
+    if (typeof lotId === 'string' && lotId) {
+      void fetchCloudLot(lotId).then((found) => {
+        if (!active || !found) return;
+        setLot(found);
+        setType(found.sample_type);
+        setWoreda(found.woreda);
+        setFeresula(String(Number((found.lot_weight_kg / KG_PER_FERESULA).toFixed(2))));
+      });
+    }
+    return () => { active = false; };
+  }, [lotId]);
 
   const weightInKg = Number(feresula) * KG_PER_FERESULA;
   const validWeight = Number.isFinite(Number(feresula)) && Number(feresula) > 0 && Number(feresula) <= 100000 / KG_PER_FERESULA;
@@ -69,12 +87,12 @@ export default function Scan() {
       return;
     }
     const captureId = 'bunalens-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-    const batchCode = 'BNL-JMA-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const batchCode = lot?.batch_code ?? 'BNL-JMA-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     setBusy(true);
     try {
       if (!(await isOnline())) {
         await enqueueCapture({
-          id: captureId, batch_code: batchCode, image_uri: preview.uri, sample_type: type, woreda,
+          id: captureId, batch_code: batchCode, batch_id: lot?.id, image_uri: preview.uri, sample_type: type, woreda,
           lot_weight_kg: weightInKg, created_at: new Date().toISOString(),
           station_id: station.id, mime_type: preview.mimeType,
         });
@@ -117,7 +135,7 @@ export default function Scan() {
           }
         } catch { /* GPS is optional; the operator can still assess the sample. */ }
       }
-      const batch = await submitCoffeeSample(preview.base64, type, woreda, station.id, captureId, weightInKg, preview.mimeType, coordinates, batchCode);
+      const batch = await submitCoffeeSample(preview.base64, type, woreda, station.id, captureId, weightInKg, preview.mimeType, coordinates, batchCode, lot?.id);
       if (!hasPro) consumeCredit();
       const savedImage = await persistLocalImage(preview.uri, captureId, preview.mimeType).catch(() => preview.uri);
       const finalBatch: CoffeeBatch = { ...batch, image_uri: savedImage, origin_coordinates: coordinates, status: 'synced' };
@@ -132,7 +150,7 @@ export default function Scan() {
       if (retryable) {
         try {
           await enqueueCapture({
-            id: captureId, batch_code: batchCode, image_uri: preview.uri, sample_type: type, woreda,
+            id: captureId, batch_code: batchCode, batch_id: lot?.id, image_uri: preview.uri, sample_type: type, woreda,
             lot_weight_kg: weightInKg, created_at: new Date().toISOString(),
             station_id: station.id, mime_type: preview.mimeType,
           });
@@ -153,6 +171,14 @@ export default function Scan() {
     }
     const id = 'demo-' + Date.now();
     try {
+      if (lot) {
+        // Saved on the registered lot through the server, which labels it as a demo fixture.
+        await attachDemoAssessment(lot, defective, preview ? { base64: preview.base64, mimeType: preview.mimeType } : undefined);
+        setPreview(null);
+        setDemoOpen(false);
+        router.push({ pathname: '/batch/[id]', params: { id: lot.id } });
+        return;
+      }
       // A captured photograph may be retained with the local demo record for
       // traceability. The preset assessment remains simulated and never claims
       // to have analysed the photograph.
@@ -188,10 +214,16 @@ export default function Scan() {
         <Text className="text-xs ml-2 flex-1 leading-5" style={{ color: '#7C2D12' }}>{t('fieldLighting')}</Text>
       </View>
 
+      {lot ? (
+        <View testID="scan-lot-banner" className="rounded-2xl p-4 mb-4" style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' }}>
+          <Text className="text-xs font-extrabold" style={{ color: '#065F46' }}>Photographing a sample for lot {lot.batch_code}</Text>
+          <Text className="text-[11px] mt-1" style={{ color: '#065F46' }}>Lot ID: {lot.id} · {lot.sample_type === 'red_cherry' ? 'Red cherries' : 'Green beans'} · {lot.woreda} · {lot.lot_weight_kg} kg. The assessment is saved on this lot. Stage, origin and weight come from the lot record.</Text>
+        </View>
+      ) : null}
       <Text className="text-sm font-extrabold mb-2" style={{ color: theme.colors.espresso }}>{t('selectSampleType')}</Text>
       <View className="flex-row gap-3 mb-5">
         {(['red_cherry', 'green_bean'] as const).map((sample) => (
-          <Pressable key={sample} accessibilityRole="button" accessibilityState={{ selected: type === sample }} onPress={() => setType(sample)}
+          <Pressable key={sample} accessibilityRole="button" accessibilityState={{ selected: type === sample, disabled: Boolean(lot) }} disabled={Boolean(lot)} onPress={() => setType(sample)}
             className={`flex-1 p-4 rounded-3xl border-2 ${type === sample ? 'bg-cherry-soft border-cherry' : 'bg-white border-line'}`}>
             <View className="flex-row items-center justify-between"><Coffee color={type === sample ? theme.colors.cherry : theme.colors.secondary} size={21} />{type === sample ? <ShieldCheck color={theme.colors.cherry} size={17} /> : null}</View>
             <Text className="text-sm font-extrabold mt-3" style={{ color: theme.colors.espresso }}>{sample === 'red_cherry' ? t('redCherries') : t('greenBeans')}</Text>

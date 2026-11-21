@@ -70,13 +70,29 @@ export function validateGradingResult(value: unknown): GradingResult {
     sorting_action_advice: v.sorting_action_advice.slice(0, 1000),
     assessment_limitations: (v.assessment_limitations as string[]).slice(0, 12).map((s) => s.slice(0, 300)),
     assessment_method: 'ai_visual_estimate',
+    ...(isScreening(v.screening) ? { screening: v.screening } : {}),
   };
+}
+
+/** Shape check for the server-built screening summary; anything else is dropped. */
+function isScreening(value: unknown): value is NonNullable<GradingResult['screening']> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const s = value as Record<string, unknown>;
+  const photo = s.photo as Record<string, unknown> | undefined;
+  return s.schema_version === 1 && (s.source === 'live_inference' || s.source === 'demo_fixture') &&
+    (s.sample_stage === 'red_cherry' || s.sample_stage === 'green_bean') && s.official_grade === 'Unclassified' &&
+    typeof s.provider === 'string' && typeof s.model === 'string' && typeof s.assessed_at === 'string' &&
+    typeof s.next_action === 'string' && typeof s.needs_review === 'boolean' &&
+    [s.observations, s.suspected_defects, s.not_assessed, s.limitations, s.review_reasons].every(Array.isArray) &&
+    Boolean(photo) && typeof photo === 'object' && Array.isArray(photo?.issues);
 }
 
 export async function submitCoffeeSample(
   base64: string, sampleType: SampleType, woreda: string, stationId: string,
   idempotencyKey: string, lotWeightKg: number, mimeType = 'image/jpeg',
   coordinates?: { latitude: number; longitude: number }, batchCode?: string,
+  /** Existing registered lot this photo belongs to. Omit to create a new record. */
+  batchId?: string,
 ): Promise<CoffeeBatch> {
   if (process.env.EXPO_PUBLIC_DEMO_MODE === 'true') {
     throw new GradingServiceError('Demo mode is enabled. Use a clearly labelled demo sample or set EXPO_PUBLIC_DEMO_MODE=false to enable authenticated cloud grading.', 'configuration');
@@ -105,6 +121,7 @@ export async function submitCoffeeSample(
         image_mime_type: mimeType,
         image_base64: base64.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '').replace(/\s/g, ''),
         gps_latitude: coordinates?.latitude, gps_longitude: coordinates?.longitude, batch_code: batchCode,
+        batch_id: batchId,
       }),
     });
   } catch (error) {

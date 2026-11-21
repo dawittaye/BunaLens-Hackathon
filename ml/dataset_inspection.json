@@ -1,0 +1,242 @@
+{
+ "inspected_at": "2026-11-21T11:24:09.869957+00:00",
+ "method": "Kaggle public API metadata and file listings; listing capped at 2400 files per dataset",
+ "datasets": [
+  {
+   "ref": "patopucho/lojano-arabica-coffee",
+   "url": "https://www.kaggle.com/datasets/patopucho/lojano-arabica-coffee",
+   "title": "Lojano Arabica coffee",
+   "license": "Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)",
+   "version": 1,
+   "last_updated": "2025-12-01T15:34:18.933Z",
+   "total_bytes": 725883590,
+   "subtitle": "A curated dataset of Loja Arabica green coffee beans for binary quality assessme",
+   "files_listed": 1456,
+   "listing_truncated": false,
+   "images_listed": 1436,
+   "other_files": [
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0246.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0249.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0251.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0253.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0255.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0257.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0261.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0263.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0265.CR3",
+    "dataset-lojano/fotos en bruto/raw/bueno/IMG_0267.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0224.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0226.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0228.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0230.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0232.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0234.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0236.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0238.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0240.CR3",
+    "dataset-lojano/fotos en bruto/raw/defectuoso/IMG_0242.CR3"
+   ],
+   "extension_counts": {
+    ".jpg": 1436,
+    ".cr3": 20
+   },
+   "folder_image_counts": {
+    "dataset-lojano/fotos en bruto/jpg/bueno": 10,
+    "dataset-lojano/fotos en bruto/jpg/defectuoso": 10,
+    "dataset-lojano/img-recortadas/bueno": 500,
+    "dataset-lojano/img-recortadas/defectuoso": 500,
+    "img-generalizacon/completas/bueno": 8,
+    "img-generalizacon/completas/defectuoso": 8,
+    "img-generalizacon/recortadas/bueno": 200,
+    "img-generalizacon/recortadas/defectuoso": 200
+   },
+   "sample_files": [
+    "dataset-lojano/fotos en bruto/jpg/bueno/IMG_0246.JPG",
+    "dataset-lojano/fotos en bruto/jpg/bueno/IMG_0249.JPG",
+    "dataset-lojano/fotos en bruto/jpg/bueno/IMG_0251.JPG",
+    "dataset-lojano/fotos en bruto/jpg/bueno/IMG_0253.JPG",
+    "dataset-lojano/fotos en bruto/jpg/bueno/IMG_0255.JPG"
+   ]
+  },
+  {
+   "ref": "j4ckdev/green-coffee-beans-dataset",
+   "url": "https://www.kaggle.com/datasets/j4ckdev/green-coffee-beans-dataset",
+   "title": "Green Coffee Beans Dataset",
+   "license": "CC BY-NC-SA 4.0",
+   "version": 4,
+   "last_updated": "2022-10-27T20:19:35.557Z",
+   "total_bytes": 4740651,
+   "subtitle": "Eleven green coffee beans types between good and defective beans",
+   "files_listed": 13,
+   "listing_truncated": false,
+   "images_listed": 11,
+   "other_files": [
+    "LICENSE-CC-BY-NC-SA",
+    "README.md"
+   ],
+   "extension_counts": {
+    ".jpg": 11,
+    "": 1,
+    ".md": 1
+   },
+   "folder_image_counts": {
+    "ImageDataset": 11
+   },
+   "sample_files": [
+    "ImageDataset/BrocadoLeve.jpg",
+    "ImageDataset/BrocadoSevero.jpg",
+    "ImageDataset/CerezaSeca.jpg",
+    "ImageDataset/Concha.jpg",
+    "ImageDataset/DXHongo.jpg"
+   ]
+  },
+  {
+   "ref": "sot2542/coffee-bean-dataset-v2",
+   "url": "https://www.kaggle.com/datasets/sot2542/coffee-bean-dataset-v2",
+   "title": "Coffee Bean Dataset Version 2",
+   "license": "CC BY-SA 4.0",
+   "version": 1,
+   "last_updated": "2022-08-10T02:14:42.37Z",
+   "total_bytes": 86715704764,
+   "subtitle": "Multiclass classification data for much seed-roasted coffee beans.",
+   "files_listed": 2400,
+   "listing_truncated": true,
+   "images_listed": 2400,
+   "other_files": [],
+   "extension_counts": {
+    ".png": 2400
+   },
+   "folder_image_counts": {
+    "test": 1200,
+    "train/Lightbox + Bottle/Dark": 300,
+    "train/Lightbox + Bottle/Green": 300,
+    "train/Lightbox + Bottle/Light": 300,
+    "train/Lightbox + Bottle/Medium": 300
+   },
+   "sample_files": [
+    "test/Dark (1).png",
+    "test/Dark (10).png",
+    "test/Dark (100).png",
+    "test/Dark (101).png",
+    "test/Dark (102).png"
+   ]
+  },
+  {
+   "ref": "gpiosenka/coffee-bean-dataset-resized-224-x-224",
+   "url": "https://www.kaggle.com/datasets/gpiosenka/coffee-bean-dataset-resized-224-x-224",
+   "title": "Coffee Bean Dataset Resized (224 X 224)",
+   "license": "CC BY-SA 4.0",
+   "version": 1,
+   "last_updated": "2022-08-11T17:50:37.793Z",
+   "total_bytes": 155191987,
+   "subtitle": "Multiclass classification data for each seed roasted coffee bean",
+   "files_listed": 1601,
+   "listing_truncated": false,
+   "images_listed": 1600,
+   "other_files": [
+    "Coffee Bean.csv"
+   ],
+   "extension_counts": {
+    ".csv": 1,
+    ".png": 1600
+   },
+   "folder_image_counts": {
+    "test/Dark": 100,
+    "test/Green": 100,
+    "test/Light": 100,
+    "test/Medium": 100,
+    "train/Dark": 300,
+    "train/Green": 300,
+    "train/Light": 300,
+    "train/Medium": 300
+   },
+   "sample_files": [
+    "Coffee Bean.csv",
+    "test/Dark/dark (1).png",
+    "test/Dark/dark (10).png",
+    "test/Dark/dark (100).png",
+    "test/Dark/dark (11).png"
+   ]
+  },
+  {
+   "ref": "harisyunanda/dataset-coffee-cherry",
+   "url": "https://www.kaggle.com/datasets/harisyunanda/dataset-coffee-cherry",
+   "title": "Dataset Coffee cherry",
+   "license": "Database: Open Database, Contents: Database Contents",
+   "version": 1,
+   "last_updated": "2025-04-18T04:52:49.377Z",
+   "total_bytes": 1896283527,
+   "subtitle": "Annotated Images of Coffee Cherries at Different Ripeness Levels for Object Dete",
+   "files_listed": 866,
+   "listing_truncated": false,
+   "images_listed": 432,
+   "other_files": [
+    "classes.txt",
+    "labels/017df65b-IMG_20241224_094633.txt",
+    "labels/01a17c48-IMG_20241224_093501.txt",
+    "labels/020339c2-IMG_20241224_103355.txt",
+    "labels/02263ffb-IMG_20241224_094305.txt",
+    "labels/022e25f5-IMG_20241224_093535.txt",
+    "labels/02faa803-IMG_20241224_094544.txt",
+    "labels/0334f0bb-IMG_20241224_102351.txt",
+    "labels/033a17ac-IMG_20241224_093335.txt",
+    "labels/036e4dd2-IMG_20241224_101441.txt",
+    "labels/0465314e-IMG_20241224_093138.txt",
+    "labels/04728d18-IMG_20241224_095933.txt",
+    "labels/070d0661-IMG_20241224_092940.txt",
+    "labels/070d2e16-IMG_20241224_101803.txt",
+    "labels/0807c3af-IMG_20241224_103208.txt",
+    "labels/08793a95-IMG_20241224_092657.txt",
+    "labels/08a33d43-IMG_20241224_102158.txt",
+    "labels/0a0d0b8a-IMG_20241224_103429.txt",
+    "labels/0a49d4bb-IMG_20241224_103237.txt",
+    "labels/0a7071cc-IMG_20241224_095530.txt",
+    "labels/0ba47036-IMG_20241224_103004.txt",
+    "labels/0ba951fc-IMG_20241224_093549.txt",
+    "labels/0bffc281-IMG_20241224_094315.txt",
+    "labels/0c07b237-IMG_20241224_104205.txt",
+    "labels/0d699776-IMG_20241224_095340.txt"
+   ],
+   "extension_counts": {
+    ".txt": 433,
+    ".jpg": 432,
+    ".json": 1
+   },
+   "folder_image_counts": {
+    "images": 432
+   },
+   "sample_files": [
+    "classes.txt",
+    "images/017df65b-IMG_20241224_094633.jpg",
+    "images/01a17c48-IMG_20241224_093501.jpg",
+    "images/020339c2-IMG_20241224_103355.jpg",
+    "images/02263ffb-IMG_20241224_094305.jpg"
+   ]
+  },
+  {
+   "ref": "asimmahmudov/top-rated-coffee",
+   "url": "https://www.kaggle.com/datasets/asimmahmudov/top-rated-coffee",
+   "title": "Top Rated Coffee",
+   "license": "CC0: Public Domain",
+   "version": 1,
+   "last_updated": "2025-05-22T15:10:32.05Z",
+   "total_bytes": 607167,
+   "subtitle": "Explore 2,200+ Top-Rated Coffee Reviews with Detailed Roast and Origin Data",
+   "files_listed": 2,
+   "listing_truncated": false,
+   "images_listed": 0,
+   "other_files": [
+    "top-rated-coffee-clean.csv",
+    "top-rated-coffee.csv"
+   ],
+   "extension_counts": {
+    ".csv": 2
+   },
+   "folder_image_counts": {},
+   "sample_files": [
+    "top-rated-coffee-clean.csv",
+    "top-rated-coffee.csv"
+   ]
+  }
+ ]
+}

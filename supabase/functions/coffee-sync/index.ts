@@ -1,6 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { buildScreening } from "../_shared/screening.ts";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
+// Response shape shared by the lot-attached paths added for the hackathon sprint.
+const asBatch=(row:Record<string,any>,extra:Record<string,unknown>={})=>({id:row.id,batch_code:row.batch_code,sample_type:row.sample_type,woreda:row.woreda,created_at:row.created_at,result:row.grading_result,lot_weight_kg:Number(row.lot_weight_kg),status:"synced",station_id:row.station_id,verification_id:row.verification_id,pricing:row.pricing_result||undefined,...extra});
 const imageSignatureMatches=(bytes:Uint8Array,mime:string)=>{
  if(mime==="image/jpeg")return bytes.length>3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
  if(mime==="image/png")return bytes.length>8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a;
@@ -29,6 +32,9 @@ Deno.serve(async(req)=>{
   if(typeof stationId!=="string"||!/^([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(stationId))return reply({error:"Invalid station"},400);
   if(typeof idempotencyKey!=="string"||!/^[a-zA-Z0-9_-]{8,128}$/.test(idempotencyKey))return reply({error:"Invalid idempotency key"},400);
   if(batchCode!==undefined&&(typeof batchCode!=="string"||!/^BNL-JMA-[A-Z0-9]{4}$/.test(batchCode)))return reply({error:"Invalid batch code"},400);
+  // Optional: attach this photo assessment to a lot that was registered earlier.
+  const batchId=body.batch_id;
+  if(batchId!==undefined&&(typeof batchId!=="string"||!/^[A-Za-z0-9_-]{8,160}$/.test(batchId)))return reply({error:"Invalid lot"},400);
   if(!["red_cherry","green_bean"].includes(sampleType))return reply({error:"Invalid sample type"},400);
   if(!["Gomma","Limmu Kossa","Mana","Seka Chekorsa","Gera","Kersa","Jimma Town"].includes(woreda))return reply({error:"Invalid woreda"},400);
   if(!Number.isFinite(weight)||weight<=0||weight>100000)return reply({error:"Invalid lot weight"},400);
@@ -39,6 +45,16 @@ Deno.serve(async(req)=>{
   const {data:station,error:stationError}=await userClient.from("stations").select("id").eq("id",stationId).eq("owner_id",userData.user.id).maybeSingle();
   if(stationError||!station)return reply({error:"Station access denied"},403);
   const db=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
+  let lot:Record<string,any>|null=null;
+  if(batchId!==undefined){
+   const {data:found}=await db.from("coffee_batches").select("*").eq("id",batchId).maybeSingle();
+   if(!found||found.station_id!==stationId)return reply({error:"Lot access denied"},403);
+   // Red-cherry and green-bean assessments stay separate: the photo must match the registered stage.
+   if(found.sample_type!==sampleType)return reply({error:"This lot is registered as "+(found.sample_type==="red_cherry"?"red cherries":"green beans")+". Photograph the same coffee stage or register a separate lot."},409);
+   // A retry of the same capture returns the assessment that is already saved.
+   if(found.grading_result?.screening?.capture_key===idempotencyKey)return reply({batch:asBatch(found)});
+   lot=found;
+  }
   const {data:existing}=await db.from("coffee_batches").select("*").eq("station_id",stationId).eq("idempotency_key",idempotencyKey).maybeSingle();
   if(existing)return reply({batch:{id:existing.id,batch_code:existing.batch_code,sample_type:existing.sample_type,woreda:existing.woreda,created_at:existing.created_at,result:existing.grading_result,lot_weight_kg:Number(existing.lot_weight_kg),status:"synced",station_id:existing.station_id,verification_id:existing.verification_id,pricing:existing.pricing_result||undefined}});
   const gradeController=new AbortController();
@@ -61,16 +77,31 @@ Deno.serve(async(req)=>{
   const lat=Number(body.gps_latitude),lng=Number(body.gps_longitude);
   const hasGps=Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180;
   const ext=mime==="image/png"?"png":mime==="image/webp"?"webp":"jpg";
-  const imagePath=stationId+"/"+idempotencyKey+"."+ext;
+  const imagePath=stationId+"/"+(lot?lot.id+"-":"")+idempotencyKey+"."+ext;
+  const screening=buildScreening(result,sampleType,{source:"live_inference",provider:"google",model:typeof gradePayload.model==="string"?gradePayload.model:"not recorded",assessedAt:typeof gradePayload.assessed_at==="string"?gradePayload.assessed_at:new Date().toISOString(),captureKey:idempotencyKey});
+  const stored={...result,screening};
   const {error:uploadError}=await db.storage.from("coffee-samples").upload(imagePath,bytes,{contentType:mime,upsert:true});
   if(uploadError){console.error("Sample upload failed",uploadError);return reply({error:"Could not store the sample image. Retry synchronization."},503)}
   const {data:benchmark}=await db.from("market_benchmarks").select("id,min_etb_per_feresula,max_etb_per_feresula,source_label,effective_date,is_demo").eq("sample_type",sampleType).eq("ecx_style_grade",result.ecx_grade).eq("active",true).order("effective_date",{ascending:false}).limit(1).maybeSingle();
   let pricing:any=undefined;
   if(benchmark){const mid=(Number(benchmark.min_etb_per_feresula)+Number(benchmark.max_etb_per_feresula))/2;pricing={benchmark_id:benchmark.id,source_label:benchmark.source_label,effective_date:benchmark.effective_date,is_demo:benchmark.is_demo,min_etb_per_feresula:Number(benchmark.min_etb_per_feresula),max_etb_per_feresula:Number(benchmark.max_etb_per_feresula),estimated_price_per_feresula_etb:Math.round(mid),estimated_price_per_kg_etb:Number((mid/17).toFixed(2)),estimated_lot_value_etb:Math.round(mid*weight/17),min_lot_value_etb:Math.round(Number(benchmark.min_etb_per_feresula)*weight/17),max_lot_value_etb:Math.round(Number(benchmark.max_etb_per_feresula)*weight/17),potential_sorting_gain_etb:Math.round((Number(benchmark.max_etb_per_feresula)-mid)*weight/17)};}
+  if(lot){
+   // A new assessment replaces the previous one, so any earlier eligibility decision no longer applies.
+   const {data:updated,error:updateError}=await db.from("coffee_batches").update({
+    image_path:imagePath,grading_result:stored,pricing_result:pricing||null,grading_status:"completed",is_demo:false,ecx_grade:"Unclassified",quality_score:result.quality_score,confidence_score:result.confidence_score,
+    eligibility_status:"unreviewed",eligibility_updated_at:new Date().toISOString(),
+    ...(hasGps?{gps_latitude:lat,gps_longitude:lng}:{})
+   }).eq("id",lot.id).eq("station_id",stationId).select("*").single();
+   if(updateError||!updated){
+    console.error("Lot assessment persistence failed",updateError);
+    return reply({error:"Assessment completed but the lot record could not be updated. Retry using the same capture."},503);
+   }
+   return reply({batch:asBatch(updated,{origin_coordinates:hasGps?{latitude:lat,longitude:lng}:undefined})});
+  }
   const finalBatchCode=typeof batchCode==="string"?batchCode:"BNL-JMA-"+Math.random().toString(36).slice(2,6).toUpperCase();
   const {data:created,error:createError}=await db.from("coffee_batches").insert({
    id:idempotencyKey,station_id:stationId,batch_code:finalBatchCode,sample_type:sampleType,woreda,
-   lot_weight_kg:weight,image_path:imagePath,grading_result:result,idempotency_key:idempotencyKey,
+   lot_weight_kg:weight,image_path:imagePath,grading_result:stored,idempotency_key:idempotencyKey,
    pricing_result:pricing||null,gps_latitude:hasGps?lat:null,gps_longitude:hasGps?lng:null,created_at:body.captured_at||new Date().toISOString()
   }).select("id,batch_code,sample_type,woreda,created_at,lot_weight_kg,station_id,verification_id,grading_result,pricing_result").single();
   if(createError){

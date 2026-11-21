@@ -12,5 +12,10 @@ verify_jwt = true
 [functions.chapa-webhook]
 verify_jwt = false
 
+# Hackathon sprint addition. The provider callback carries no user token; signed-in
+# actions are authenticated inside the function.
+[functions.chapa-order-payment]
+verify_jwt = false
+
 [functions.certificate-verify]
 verify_jwt = false

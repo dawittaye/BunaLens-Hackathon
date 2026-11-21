@@ -23,6 +23,8 @@ export interface GradingResult {
   sorting_action_advice: string;
   assessment_limitations: string[];
   assessment_method: 'ai_visual_estimate';
+  /** Lot screening summary saved by the server with the assessment (sprint addition). */
+  screening?: import('@/supabase/functions/_shared/screening').LotScreening;
   /** Backward-compatible fields for older locally saved records. */
   confidence?: number;
   assessment_note?: string;
@@ -50,6 +52,8 @@ export interface CoffeeBatch {
   woreda: string;
   created_at: string;
   image_uri?: string;
+  /** Private storage path of the sample photo saved with the lot (sprint addition). */
+  image_path?: string;
   origin_coordinates?: { latitude: number; longitude: number };
   result: GradingResult;
   lot_weight_kg: number;

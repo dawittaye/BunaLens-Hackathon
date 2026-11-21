@@ -31,3 +31,6 @@ expo-env.d.ts
 # @end expo-cli
 # Hackathon sprint: model weights and training artifacts stay out of Git
 ml/artifacts/
+
+# Hackathon sprint: local payment-check state (ids only)
+.order-payment-check.json

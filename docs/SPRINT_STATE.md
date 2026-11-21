@@ -1,13 +1,14 @@
 # BunaLens Sprint State
 
-Last updated: 2026-11-21T15:01+03:00, end of Phase 6.
+Last updated: 2026-11-21T15:11+03:00, end of Phase 7.
 
 Read `docs/SPRINT_RULES.md` before continuing. Supporting records:
 `docs/FOUNDATION.md` (audit, schema, configuration),
 `docs/DEVICE_INGESTION.md` (payload, replay, checks, limitations) and
 `docs/PHOTO_SCREENING.md` (screening record, dataset inspection, what ran)
-`docs/ELIGIBILITY.md` (demo policy, exact rules, demo cases, checks) and
-`docs/MARKETPLACE.md` (routes, functions, order states, stock, checks). No secret
+`docs/ELIGIBILITY.md` (demo policy, exact rules, demo cases, checks),
+`docs/MARKETPLACE.md` (routes, functions, order states, stock, checks) and
+`docs/ORDER_PAYMENTS.md` (Chapa test payment, rules, what ran). No secret
 values belong in this file.
 
 ## Time
@@ -22,8 +23,9 @@ values belong in this file.
 | Phase 4 active work | 14:22:48 to about 14:41, about 18 minutes. Over its share of the budget |
 | Phase 5 active work | 14:43 to about 14:50, about 8 minutes |
 | Phase 6 active work | 14:52 to about 15:01, about 10 minutes |
-| Elapsed active time | about 63 minutes. The 60-minute budget was passed during Phase 6, at about 14:59 |
-| Remaining budget | None. Phases 7 and 8 would be over budget |
+| Phase 7 active work | 15:02 to about 15:11, about 10 minutes |
+| Elapsed active time | about 73 minutes. The 60-minute budget was passed during Phase 6, at about 14:59 |
+| Remaining budget | None. Phase 8 is over budget |
 | Interruptions (not counted) | 13:38:12 to 13:42:25, 13:53:11 to 13:55:35, 14:05:17 to 14:22:48, 14:41 to 14:43 and 14:51 to 14:52, waiting for phase instructions |
 
 ## Repository
@@ -49,7 +51,7 @@ values belong in this file.
 | 4. Photo screening and dataset experiment | Complete for the demo-fixture path. Live Gemini path written but not run. No model trained |
 | 5. Publication policy and reviewer workflow | Complete on the server with a DEMO policy and simulated readings. Lot-screen card not seen in a browser; no screens for readings or reviewer decisions |
 | 6. Marketplace and orders | Complete on the server and verified through the HTTP API, including concurrent acceptance. Screens written, type-checked and bundled, not opened in a browser |
-| 7. Chapa test payments | Not started |
+| 7. Chapa test payments | Complete. One order paid in Chapa TEST mode and verified by the server. Failure, mismatch, expiry and late success checked with simulated provider answers only. App buttons not opened in a browser |
 | 8. End-to-end verification and handoff | Not started |
 
 ## Implemented changes
@@ -89,6 +91,11 @@ Everything not listed here is imported and unchanged.
 | "Market" tab added (imported file, modified); seller listing card on the lot screen | `app/(tabs)/_layout.tsx`, `components/LotListingCard.tsx`, `app/batch/[id].tsx` | 6 |
 | Phase 6 checks and demo listings | `scripts/hackathon/verify-marketplace.mjs` | 6 |
 | Routes, states, stock and check record | `docs/MARKETPLACE.md` | 6 |
+| Order payment functions and columns | `supabase/migrations/20261121150500_hackathon_order_payments.sql` | 7 |
+| Order payment Edge Function (new, separate from the credit functions); function config entry | `supabase/functions/chapa-order-payment/index.ts`, `supabase/config.toml` | 7 |
+| Pay, check payment and verified-payment list; payment data access | `app/market/orders.tsx`, `services/marketplace.ts` | 7 |
+| Phase 7 checks | `scripts/hackathon/verify-order-payment.mjs`, `supabase/tests/hackathon_order_payment_check.sql` | 7 |
+| Payment record | `docs/ORDER_PAYMENTS.md` | 7 |
 
 ## Checks actually run
 
@@ -108,7 +115,13 @@ Everything not listed here is imported and unchanged.
 | `npm run typecheck` after the Phase 5 client changes | local | Passed |
 | `node scripts/hackathon/verify-marketplace.mjs`, 59 checks with two sellers and two buyers, normal sessions only | local test stack, HTTP API | All passed: 58 of 58 on the first run; 59 of 59 on three further runs, after one check was added and the order checks were moved to a lot created per run. Includes six parallel acceptances against 300 kg: three accepted, never above stock |
 | `npm run typecheck` and `npx expo export --platform web` after the Phase 6 client changes | local | Both passed |
-| Any Phase 4, 5 or 6 screen in a browser | — | Not run |
+| `node scripts/hackathon/verify-order-payment.mjs`, function served from this checkout with Deno, real Chapa TEST API | local test stack + Chapa test mode | 18 of 18 passed: checkout opened for 900 ETB, retry, authorization, forged callbacks ignored |
+| Chapa hosted checkout paid in a browser with Chapa's test phone number | Chapa test mode | Receipt "Paid", 900.00 ETB, "Test Mode: Not a real payment." |
+| `node scripts/hackathon/verify-order-payment.mjs --confirm` | local test stack + Chapa test mode | 6 of 6 passed: Chapa verify reports success, order `paid_test`, duplicates change nothing |
+| `supabase/tests/hackathon_order_payment_check.sql`, rolled back, SIMULATED provider answers | local test database | 19 of 19 passed: mismatch, failure, expiry, stock release, late success |
+| `npx -y deno check` of `chapa-order-payment`; `npm run typecheck`; `npx expo export --platform web` | local | All passed |
+| Credit checkout files and `station_payments` rows | Git and local database | Unchanged. The credit checkout itself was not exercised |
+| Any Phase 4, 5, 6 or 7 screen of the app in a browser | — | Not run |
 | `python ml/inspect_datasets.py` | Kaggle public API | Ran; output in `ml/dataset_inspection.json` |
 | Model training | — | Not run. PyTorch is not installed |
 | `npx expo-doctor` | — | Not run |
@@ -118,8 +131,8 @@ Everything not listed here is imported and unchanged.
 
 | Environment | State |
 |---|---|
-| Local test stack `bunalens-db-test-20261118-165455` | Base schema, nine imported migrations and all five sprint migrations applied with `psql`. No CLI migration history table |
-| Hosted production | Nothing applied, nothing written. All five sprint migrations and the two modified functions are pending there and must stay pending during the sprint |
+| Local test stack `bunalens-db-test-20261118-165455` | Base schema, nine imported migrations and all six sprint migrations applied with `psql`. No CLI migration history table |
+| Hosted production | Nothing applied, nothing written. All six sprint migrations, the two modified functions and the new `chapa-order-payment` function are pending there and must stay pending during the sprint |
 
 Ignored files in the checkout: `.env` (local stack), `.env.hosted`,
 `.env.backend`, `supabase/functions/.env`. Phase 3 added these names to
@@ -144,7 +157,12 @@ New names in `.env.backend`: `BUNALENS_DEMO_REVIEWER_PASSWORD`,
 (`BUNALENS_DEMO_BUYER_PASSWORD`, `BUNALENS_DEMO_BUYER_B_PASSWORD`), both demo
 sellers approved, three published DEMO listings (BNL-JMA-0688 500 kg at 450,
 BNL-JMA-B7E4 400 kg at 520, BNL-JMA-6D1D 800 kg at 38 ETB per kg), and demo
-orders from the verification runs, all unpaid.
+orders from the verification runs. Phase 7 added one accepted 2 kg order on
+BNL-JMA-0688 paid in Chapa TEST mode (900 ETB, `paid_test`), so that listing
+now has 498 kg. Every other order is unpaid. New optional names: backend
+`CHAPA_ORDER_CALLBACK_URL`, `CHAPA_ORDER_RETURN_URL`; client
+`EXPO_PUBLIC_CHAPA_ORDER_PAYMENT_URL`. The ignored file
+`.order-payment-check.json` holds the last checked order id and reference.
 
 ## Live versus simulated integrations
 
@@ -155,9 +173,10 @@ orders from the verification runs, all unpaid.
 | Warehouse device ingestion | Endpoint live on the local stack. All readings are SIMULATED. No physical device, no `live` reading |
 | Gemini screening | Not exercised, key missing. Saving on an existing lot is written and type-checked only |
 | Photo assessment on a lot | DEMO FIXTURE only, saved through the local stack. No photo has been analysed by a model |
-| Chapa | Code imported, not exercised. A test-mode key is configured for local functions |
+| Chapa, coffee orders | Live against the Chapa TEST API from a locally served function: initialize and verify exercised, one test payment verified. No live-mode call, no payout |
+| Chapa, station credits | Imported code, unchanged, not exercised |
 | Publication eligibility | Live on the local stack under a DEMO policy. Every reading is SIMULATED; no instrument was used |
-| Marketplace and orders | Live on the local stack through the HTTP API. All listings are DEMO with simulated evidence. No order has a payment |
+| Marketplace and orders | Live on the local stack through the HTTP API. All listings are DEMO with simulated evidence. One order has a verified TEST payment |
 | Dataset and trained model | Six datasets inspected from listings. No model trained, none integrated |
 
 ## Blockers and open items
@@ -168,8 +187,9 @@ orders from the verification runs, all unpaid.
 3. Kaggle access works through `kagglehub`. Training is blocked by missing
    PyTorch; see `docs/PHOTO_SCREENING.md`.
 4. The local Edge runtime container serves functions from the earlier test
-   directory under `%TEMP%`, not from this checkout. Still unsolved. It
-   blocks local runs of `coffee-sync` and, in Phase 7, the Chapa functions.
+   directory under `%TEMP%`, not from this checkout. Still unsolved for the container. Phase 7 worked around it by serving
+   `chapa-order-payment` directly with Deno. `coffee-sync` was not served that
+   way because `GEMINI_API_KEY` is missing.
 5. Hosted schema drift, the two undeployed hosted functions and the Auth URL
    gaps are unchanged; see `docs/FOUNDATION.md`.
 6. There is no screen for registering a lot or creating a zone and device,
@@ -180,23 +200,21 @@ orders from the verification runs, all unpaid.
 
 ## Uncommitted task-owned files
 
-None after the Phase 6 commit.
+None after the Phase 7 commit.
 
 ## Exact next action
 
-Wait for the instruction to start Phase 7. The 60-minute budget is used up,
-so confirm whether to continue. Then, on `feat/hackathon-lot-to-order`:
+Wait for the instruction to start Phase 8. The budget is used up, so keep
+it to verification and the handoff document. On `feat/hackathon-lot-to-order`:
 
-1. Solve blocker 4 first: serve this checkout's Edge Functions against the
-   local stack. Without it no Chapa call can be exercised.
-2. Add a separate order-payment function and webhook path that write
-   `coffee_order_payments` and set `coffee_orders.payment_status`, in test
-   mode only, leaving the station-credit checkout untouched.
-3. If a test payment cannot be completed and verified, keep every order
-   "not paid" and say so.
-4. Open the lot, marketplace, listing and orders screens in a browser once.
-   None of the Phase 4, 5 or 6 screens has been seen rendered.
+1. Open the app in a browser once with the demo seller and the demo buyer:
+   lot screen (warehouse, screening, eligibility, listing cards), Market tab,
+   listing details, orders. None of these screens has been seen rendered.
+2. Write `docs/BUNALENS_SPRINT.md` from the phase records, with the
+   verification table and the three-minute walkthrough.
+3. Final commit and push. No merge, no deployment.
 
 Run order for the demo data: `verify-device-ingestion.mjs`,
 `verify-photo-screening.mjs`, `verify-eligibility.mjs`,
-`verify-marketplace.mjs`.
+`verify-marketplace.mjs`. `verify-order-payment.mjs` needs the function
+served locally; see `docs/ORDER_PAYMENTS.md`.

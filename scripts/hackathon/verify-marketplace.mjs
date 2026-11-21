@@ -57,6 +57,9 @@ const cancel = (user, orderId) => rpc(stack, 'bunalens_cancel_order', { p_order_
 const browse = async (query = '') => (await api(stack, 'GET', '/rest/v1/marketplace_listings?select=*' + query)).json; // signed out
 const listingRow = async (id) => (await browse('&id=eq.' + id))[0];
 
+// Kilograms of a lot not already taken by accepted or fulfilled orders (read with the seller's own session).
+const freeKg = async (seller, lotId, weight) => weight - (await api(stack, 'GET', '/rest/v1/coffee_orders?select=quantity_kg&batch_id=eq.' + lotId + '&status=in.(accepted,fulfilled)', { token: seller.token })).json.reduce((sum, r) => sum + Number(r.quantity_kg), 0);
+
 // ---- Seller approval and listings --------------------------------------------
 for (const station of [stationA, stationB]) {
   await rpc(stack, 'bunalens_set_seller_status', { p_station_id: station, p_status: 'approved', p_note: 'DEMO approval for the sprint walkthrough.' }, { token: admin.token });
@@ -76,8 +79,9 @@ check('a zero or negative price is refused', (await save(sellerA, lotA.id, 100, 
 const draft = await save(sellerA, lotCherry.id, 800, 38, 'draft');
 check('a saved draft is not public', draft.status === 200 && draft.json.status === 'draft' && !(await listingRow(draft.json.id)));
 const pubCherry = await save(sellerA, lotCherry.id, 800, 38, 'published');
-// 500 kg: 100 kg of this 600 kg lot went to a fulfilled demo order in the first Phase 6 run.
-const pubA = await save(sellerA, lotA.id, 500, 450, 'published');
+// The 600 kg demo lot already has accepted or fulfilled demo orders (one of them paid in Chapa test mode).
+const kgA = await freeKg(sellerA, lotA.id, 600);
+const pubA = await save(sellerA, lotA.id, kgA, 450, 'published');
 const pubMana = await save(sellerB, lotMana.id, 400, 520, 'published');
 check('sellers publish explicitly', [pubA, pubCherry, pubMana].every((r) => r.status === 200 && r.json.status === 'published'), [pubA, pubCherry, pubMana].map((r) => r.status).join(','));
 const ids = [pubA.json.id, pubCherry.json.id, pubMana.json.id];
@@ -85,7 +89,7 @@ const ids = [pubA.json.id, pubCherry.json.id, pubMana.json.id];
 // ---- Public browse -----------------------------------------------------------
 const row = await listingRow(pubA.json.id);
 const allowed = ['id', 'batch_id', 'station_id', 'seller_display_name', 'origin_woreda', 'coffee_stage', 'available_kg', 'price_per_kg_etb', 'screening_summary', 'assessed_at', 'is_demo', 'status', 'published_at', 'created_at', 'updated_at', 'batch_code', 'evidence_summary'];
-check('public listing has the buyer fields', row && row.batch_id === lotA.id && row.batch_code === lotA.batch_code && row.seller_display_name === 'DEMO Gomma Washing Station' && row.origin_woreda === 'Gomma' && row.coffee_stage === 'green_bean' && Number(row.available_kg) === 500 && Number(row.price_per_kg_etb) === 450 && row.screening_summary.startsWith('DEMO FIXTURE') && Boolean(row.assessed_at) && row.is_demo === true);
+check('public listing has the buyer fields', row && row.batch_id === lotA.id && row.batch_code === lotA.batch_code && row.seller_display_name === 'DEMO Gomma Washing Station' && row.origin_woreda === 'Gomma' && row.coffee_stage === 'green_bean' && Number(row.available_kg) === kgA && Number(row.price_per_kg_etb) === 450 && row.screening_summary.startsWith('DEMO FIXTURE') && Boolean(row.assessed_at) && row.is_demo === true);
 check('public listing has no field outside the buyer set', Object.keys(row).every((k) => allowed.includes(k)), Object.keys(row).filter((k) => !allowed.includes(k)).join(','));
 const text = JSON.stringify(row);
 check('public listing carries no credential, contact, reviewer, note or photo path', !/token|password|phone|farmer|reviewer|recorded_by|note"|image_path|capture_key|evidence_id|owner/i.test(text.replace(/not_assessed/g, '')));

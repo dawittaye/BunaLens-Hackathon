@@ -129,6 +129,57 @@ export const rejectOrder = (orderId: string) => orderAction('bunalens_decide_ord
 export const cancelOrder = orderAction('bunalens_cancel_order');
 export const fulfillOrder = orderAction('bunalens_fulfill_order');
 
+/** A Chapa payment row of an order the caller is a party to. Amounts are records of verified checkouts, not payouts. */
+export interface OrderPayment {
+  order_id: string;
+  chapa_tx_ref: string;
+  amount_etb: number;
+  currency: string;
+  status: 'pending' | 'verified' | 'failed' | 'expired';
+  is_test: boolean;
+  verified_at: string | null;
+  late_success: boolean;
+}
+
+const ORDER_PAYMENT_URL = process.env.EXPO_PUBLIC_CHAPA_ORDER_PAYMENT_URL;
+
+// Calls the chapa-order-payment Edge Function with the user's session. The function,
+// not the app, talks to Chapa and decides whether a payment is verified.
+async function orderPayment<T>(body: Record<string, unknown>): Promise<T> {
+  if (!ORDER_PAYMENT_URL) {
+    const { data, error } = await client().functions.invoke('chapa-order-payment', { body });
+    if (error) throw new Error('The payment service could not process this request.');
+    return data as T;
+  }
+  const { data: session } = await client().auth.getSession();
+  const token = session.session?.access_token;
+  if (!token) throw new Error('Sign in to pay for an order.');
+  const response = await fetch(ORDER_PAYMENT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(body),
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'The payment service could not process this request.');
+  return json as T;
+}
+
+/** Buyer: open (or reopen) the Chapa TEST checkout of an accepted order. The amount is the stored order total. */
+export const startOrderPayment = (orderId: string, idempotencyKey: string) =>
+  orderPayment<{ checkout_url: string; tx_ref: string; amount_etb: number; currency: 'ETB'; test_mode: boolean; reused: boolean }>({ action: 'initialize', orderId, idempotencyKey });
+
+/** Buyer or seller: ask the server to verify the payment with Chapa. A browser redirect alone proves nothing. */
+export const verifyOrderPayment = (orderId: string) =>
+  orderPayment<{ result: 'verified' | 'already_verified' | 'pending' | 'failed' | 'expired' | 'rejected' | 'late_success'; order_payment_status: string; provider_status: string }>({ action: 'verify', orderId });
+
+/** Verified payments of orders the caller is a party to. */
+export async function fetchVerifiedPayments(): Promise<OrderPayment[]> {
+  const { data, error } = await client().from('coffee_order_payments')
+    .select('order_id,chapa_tx_ref,amount_etb,currency,status,is_test,verified_at,late_success').eq('status', 'verified');
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({ ...row, amount_etb: Number(row.amount_etb) })) as OrderPayment[];
+}
+
 /** One accurate label per order. Acceptance is not payment. */
 export function orderStateLabel(order: Pick<CoffeeOrder, 'status' | 'payment_status'>): string {
   if (order.status === 'submitted') return 'Order submitted';

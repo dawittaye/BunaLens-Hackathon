@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View, Pressable, Image, Animated, Easing, Platform, ActivityIndicator } from 'react-native';
 import LotEnvironmentCard from '@/components/LotEnvironmentCard';
+import LotScreeningCard from '@/components/LotScreeningCard';
 import { fetchCloudLot } from '@/services/lots';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useStation } from '@/contexts/StationContext';
@@ -175,6 +176,13 @@ export default function Detail() {
         </View>
       ) : null}
 
+      {batch.result.screening ? <LotScreeningCard screening={batch.result.screening} imagePath={batch.image_path} /> : null}
+      {batch.id.startsWith('lot_') ? (
+        <Pressable testID="lot-photograph" accessibilityRole="button" onPress={() => router.push({ pathname: '/(tabs)/scan', params: { lotId: batch.id } })}
+          style={{ backgroundColor: '#7C2D12', borderRadius: 14, padding: 14, marginBottom: 14, alignItems: 'center' }}>
+          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>{batch.result.screening ? 'Photograph this lot again' : 'Photograph a sample for this lot'}</Text>
+        </Pressable>
+      ) : null}
       <LotEnvironmentCard batchId={batch.id} />
 
       <View className="border p-5 rounded-3xl mt-4" style={{ backgroundColor: theme.colors.surface, borderColor: theme.colors.line }}>

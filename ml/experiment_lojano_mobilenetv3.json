@@ -1,0 +1,49 @@
+{
+  "status": "NOT RUN",
+  "reason_not_run": "PyTorch and torchvision are not installed in this environment (Python 3.14.0), and the sprint time left for product work did not allow installing them and downloading 726 MB. No model was trained. There are no results.",
+  "results": null,
+  "task": "Image-level binary classification of single green coffee beans: good versus defective",
+  "coffee_stage": "green_bean",
+  "dataset": {
+    "ref": "patopucho/lojano-arabica-coffee",
+    "url": "https://www.kaggle.com/datasets/patopucho/lojano-arabica-coffee",
+    "version": 1,
+    "license": "CC BY-NC 4.0 (non-commercial; attribution required)",
+    "total_bytes": 725883590,
+    "download": "python -c \"import kagglehub; print(kagglehub.dataset_download('patopucho/lojano-arabica-coffee'))\""
+  },
+  "class_mapping": { "bueno": "good", "defectuoso": "defective" },
+  "splits": {
+    "train_and_validation": {
+      "folders": ["dataset-lojano/img-recortadas/bueno", "dataset-lojano/img-recortadas/defectuoso"],
+      "images_listed": { "bueno": 500, "defectuoso": 500 },
+      "validation_fraction": 0.2,
+      "seed": 20261121
+    },
+    "held_out_test": {
+      "folders": ["img-generalizacon/recortadas/bueno", "img-generalizacon/recortadas/defectuoso"],
+      "images_listed": { "bueno": 200, "defectuoso": 200 },
+      "note": "Used only for the final evaluation. Folder name suggests a separate generalisation set; this was not confirmed by opening the images."
+    }
+  },
+  "grouping_note": "Crops come from 20 full photos (10 good, 10 defective). The listing does not show which crop came from which photo, so crops from one photo may fall in both train and validation. The held-out folder is kept fully separate to limit this.",
+  "model": {
+    "architecture": "MobileNetV3-Small",
+    "weights": "torchvision MobileNet_V3_Small_Weights.IMAGENET1K_V1",
+    "change": "Replace the final classifier layer with 2 outputs"
+  },
+  "training": {
+    "image_size": 224,
+    "batch_size": 32,
+    "epochs_frozen_backbone": 3,
+    "epochs_fine_tune": 5,
+    "optimizer": "AdamW",
+    "learning_rate_head": 0.001,
+    "learning_rate_fine_tune": 0.0001,
+    "augmentation": ["random horizontal flip", "random vertical flip", "small rotation", "light colour jitter"],
+    "device": "cpu"
+  },
+  "report": ["held-out accuracy", "confusion matrix", "per-class precision and recall", "list of misclassified held-out files"],
+  "run": "pip install torch torchvision && python ml/train_mobilenetv3_small.py",
+  "integration_rule": "Do not show its output in the app until inference runs on a new green-bean photo. Its label applies to one cropped bean, not to a photo of a whole sample, and must not be turned into a defect percentage or a bean count. Do not use it on red cherries."
+}

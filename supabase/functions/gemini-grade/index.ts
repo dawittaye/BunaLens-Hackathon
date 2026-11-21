@@ -7,6 +7,9 @@ const cors = {
 };
 const percentKeys = ["sound_or_ripe_pct", "unripe_green_pct", "black_overfermented_pct", "insect_broken_pct", "foreign_matter_pct"] as const;
 const grades = ["Unclassified"] as const;
+// Optional qualitative fields. They are never required, so an older model response stays valid.
+const photoIssues = ["blurry", "too_dark", "glare", "too_few_visible", "overlapping", "partial_view"] as const;
+const sizeVariations = ["appears_uniform", "appears_mixed", "not_assessable"] as const;
 const readiness = ["Specialty Export", "Commercial Export", "Local Market Only", "Reject / Re-sort", "Insufficient Evidence"] as const;
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 const imageSignatureMatches = (bytes: Uint8Array, mime: string) => {
@@ -46,6 +49,9 @@ function validateAssessment(raw: unknown) {
     sorting_action_advice: v.sorting_action_advice.slice(0, 1000),
     assessment_limitations: [...(v.assessment_limitations as string[]).slice(0, 11).map((s) => s.slice(0, 300)), "No validated ECX-style grade mapping is configured; the visual result is therefore Unclassified."],
     assessment_method: "ai_visual_estimate" as const,
+    ...(Array.isArray(v.photo_issues) ? { photo_issues: (v.photo_issues as unknown[]).filter((x): x is typeof photoIssues[number] => photoIssues.includes(x as typeof photoIssues[number])).slice(0, 6) } : {}),
+    ...(sizeVariations.includes(v.apparent_size_variation as typeof sizeVariations[number]) ? { apparent_size_variation: v.apparent_size_variation as typeof sizeVariations[number] } : {}),
+    ...(Array.isArray(v.visible_observations) ? { visible_observations: (v.visible_observations as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 4).map((s) => s.slice(0, 240)) } : {}),
   };
 }
 
@@ -101,6 +107,7 @@ Sample type: ${sampleType}. Origin: ${woreda}, Jimma Zone, Ethiopia.
 ${sampleInstructions}
 First assess image suitability: focus/sharpness, lighting, glare/shadows, sample coverage, approximate visible sample size, overlap/crowding, and whether the image actually depicts the selected coffee type. If unrelated, set is_coffee_sample=false and give a short rejection_reason. If it is coffee but image quality or sample coverage is inadequate, keep is_coffee_sample=true, set ecx_grade="Unclassified", export_readiness="Insufficient Evidence", lower confidence_score, explain limitations, and do not overstate the percentages.
 Estimate five mutually exclusive visible composition percentages that sum to 100. State uncertainty. Do not infer moisture, water activity, cup quality, aroma, screen size, density, laboratory results, hidden defects, export compliance, or official grade. Do not invent prices, buyer offers or financial outcomes. Always set ecx_grade="Unclassified", estimated_price_per_feresula_etb=0 and potential_gain_if_sorted_etb=0 because no validated grading-to-price methodology is configured. Use "Insufficient Evidence" unless the visible image is genuinely clear; readiness is a cautious visual sorting cue only, not export approval.
+Optionally report photo_issues (any of: blurry, too_dark, glare, too_few_visible, overlapping, partial_view), apparent_size_variation (appears_uniform, appears_mixed or not_assessable; a relative visual impression only, never a measured or screen size), and up to four short visible_observations about visible damage, discolouration or cherry ripeness.
 Return only JSON. Include specific, actionable sorting_action_advice and an assessment_limitations array. assessment_method must be "ai_visual_estimate". confidence_score is 0-100.`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35_000);
@@ -124,6 +131,9 @@ Return only JSON. Include specific, actionable sorting_action_advice and an asse
                 export_readiness: { type: "STRING", enum: readiness }, sorting_action_advice: { type: "STRING" },
                 assessment_limitations: { type: "ARRAY", items: { type: "STRING" } },
                 estimated_price_per_feresula_etb: { type: "NUMBER" }, potential_gain_if_sorted_etb: { type: "NUMBER" },
+                photo_issues: { type: "ARRAY", items: { type: "STRING", enum: photoIssues } },
+                apparent_size_variation: { type: "STRING", enum: sizeVariations },
+                visible_observations: { type: "ARRAY", items: { type: "STRING" } },
               },
               required: ["is_coffee_sample", "ecx_grade", "quality_score", "confidence_score", "breakdown", "export_readiness", "sorting_action_advice", "assessment_limitations", "estimated_price_per_feresula_etb", "potential_gain_if_sorted_etb"],
             },

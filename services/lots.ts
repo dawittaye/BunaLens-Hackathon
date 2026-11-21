@@ -1,5 +1,7 @@
 import { supabase } from '@/services/supabaseClient';
 import type { CoffeeBatch, GradingResult, PricingAssessment, SampleType } from '@/types';
+import { buildScreening } from '@/supabase/functions/_shared/screening';
+import { getDemoAssessment } from '@/constants/demoSamples';
 
 /** State of the warehouse readings that apply to one lot. */
 export type LotEnvironmentState = 'no_zone' | 'no_reading' | 'fresh' | 'stale' | 'storage_ended';
@@ -47,7 +49,7 @@ export async function fetchCloudLot(id: string): Promise<CoffeeBatch | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('coffee_batches')
-    .select('id,batch_code,sample_type,woreda,created_at,lot_weight_kg,station_id,verification_id,grading_status,grading_result,pricing_result')
+    .select('id,batch_code,sample_type,woreda,created_at,lot_weight_kg,station_id,verification_id,grading_status,grading_result,pricing_result,image_path,is_demo')
     .eq('id', id)
     .maybeSingle();
   if (error || !data) return null;
@@ -62,10 +64,49 @@ export async function fetchCloudLot(id: string): Promise<CoffeeBatch | null> {
     lot_weight_kg: Number(data.lot_weight_kg),
     station_id: data.station_id,
     verification_id: data.verification_id,
-    status: assessed ? 'synced' : 'queued',
+    status: !assessed ? 'queued' : data.is_demo || data.grading_status === 'demo' ? 'demo' : 'synced',
+    image_path: data.image_path ?? undefined,
     result: assessed ? ({ ...UNASSESSED_RESULT, ...raw } as GradingResult) : UNASSESSED_RESULT,
     pricing: (data.pricing_result as PricingAssessment | null) ?? undefined,
   };
+}
+
+/** Short-lived link to a privately stored sample photo. Null when it cannot be read. */
+export async function fetchLotPhotoUrl(imagePath: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.storage.from('coffee-samples').createSignedUrl(imagePath, 600);
+  return error || !data?.signedUrl ? null : data.signedUrl;
+}
+
+/**
+ * Saves a DEMO-FIXTURE assessment on a registered lot. The values are presets and the
+ * photo is not analysed; the server forces the demo labels. The photo, when given,
+ * is stored privately so the lot keeps its photo reference.
+ */
+export async function attachDemoAssessment(
+  lot: { id: string; station_id?: string; sample_type: SampleType },
+  defective: boolean,
+  photo?: { base64: string; mimeType: string },
+): Promise<void> {
+  if (!supabase) throw new Error('Connect a station account to save an assessment on a lot.');
+  const captureKey = 'demo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  let imagePath: string | null = null;
+  if (photo && lot.station_id) {
+    const ext = photo.mimeType === 'image/png' ? 'png' : photo.mimeType === 'image/webp' ? 'webp' : 'jpg';
+    const clean = photo.base64.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '').replace(/\s/g, '');
+    const bytes = Uint8Array.from(atob(clean), (c) => c.charCodeAt(0));
+    imagePath = lot.station_id + '/' + lot.id + '-' + captureKey + '.' + ext;
+    const { error: uploadError } = await supabase.storage.from('coffee-samples').upload(imagePath, bytes.buffer as ArrayBuffer, { contentType: photo.mimeType });
+    if (uploadError) throw new Error('The photo could not be stored: ' + uploadError.message);
+  }
+  const preset = { ...getDemoAssessment(defective, lot.sample_type), ecx_grade: 'Unclassified' as const };
+  const screening = buildScreening(preset, lot.sample_type, {
+    source: 'demo_fixture', provider: 'bunalens-demo-fixture', model: 'none', assessedAt: new Date().toISOString(), captureKey,
+  });
+  const { error } = await supabase.rpc('bunalens_attach_demo_assessment', {
+    p_batch_id: lot.id, p_capture_key: captureKey, p_assessment: { ...preset, screening }, p_image_path: imagePath,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchLotEnvironment(batchId: string): Promise<LotEnvironment> {

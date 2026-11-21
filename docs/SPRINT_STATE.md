@@ -1,6 +1,6 @@
 # BunaLens Sprint State
 
-Last updated: 2026-11-21T15:11+03:00, end of Phase 7.
+Last updated: 2026-11-21T16:07+03:00, end of Phase 8. Sprint complete.
 
 Read `docs/SPRINT_RULES.md` before continuing. Supporting records:
 `docs/FOUNDATION.md` (audit, schema, configuration),
@@ -8,7 +8,7 @@ Read `docs/SPRINT_RULES.md` before continuing. Supporting records:
 `docs/PHOTO_SCREENING.md` (screening record, dataset inspection, what ran)
 `docs/ELIGIBILITY.md` (demo policy, exact rules, demo cases, checks),
 `docs/MARKETPLACE.md` (routes, functions, order states, stock, checks) and
-`docs/ORDER_PAYMENTS.md` (Chapa test payment, rules, what ran). No secret
+`docs/ORDER_PAYMENTS.md` (Chapa test payment, rules, what ran), and`ndocs/BUNALENS_SPRINT.md` (handoff: journey, walkthrough, verification). No secret
 values belong in this file.
 
 ## Time
@@ -24,9 +24,10 @@ values belong in this file.
 | Phase 5 active work | 14:43 to about 14:50, about 8 minutes |
 | Phase 6 active work | 14:52 to about 15:01, about 10 minutes |
 | Phase 7 active work | 15:02 to about 15:11, about 10 minutes |
-| Elapsed active time | about 73 minutes. The 60-minute budget was passed during Phase 6, at about 14:59 |
-| Remaining budget | None. Phase 8 is over budget |
-| Interruptions (not counted) | 13:38:12 to 13:42:25, 13:53:11 to 13:55:35, 14:05:17 to 14:22:48, 14:41 to 14:43 and 14:51 to 14:52, waiting for phase instructions |
+| Phase 8 active work | 16:01 to about 16:07, about 6 minutes |
+| Elapsed active time | about 79 minutes. The 60-minute budget was passed during Phase 6, at about 14:59 |
+| Remaining budget | None. The sprint is complete |
+| Interruptions (not counted) | 13:38:12 to 13:42:25, 13:53:11 to 13:55:35, 14:05:17 to 14:22:48, 14:41 to 14:43, 14:51 to 14:52 and 15:12 to 16:01, waiting for phase instructions |
 
 ## Repository
 
@@ -49,10 +50,10 @@ values belong in this file.
 | 2. Configuration, architecture, and data foundations | Complete |
 | 3. Warehouse device ingestion and lot traceability | Complete, with simulated readings only |
 | 4. Photo screening and dataset experiment | Complete for the demo-fixture path. Live Gemini path written but not run. No model trained |
-| 5. Publication policy and reviewer workflow | Complete on the server with a DEMO policy and simulated readings. Lot-screen card not seen in a browser; no screens for readings or reviewer decisions |
-| 6. Marketplace and orders | Complete on the server and verified through the HTTP API, including concurrent acceptance. Screens written, type-checked and bundled, not opened in a browser |
-| 7. Chapa test payments | Complete. One order paid in Chapa TEST mode and verified by the server. Failure, mismatch, expiry and late success checked with simulated provider answers only. App buttons not opened in a browser |
-| 8. End-to-end verification and handoff | Not started |
+| 5. Publication policy and reviewer workflow | Complete on the server with a DEMO policy and simulated readings. Eligibility card opened in a browser in Phase 8. No screens for recording readings or reviewer decisions |
+| 6. Marketplace and orders | Complete. HTTP checks include concurrent acceptance. Browse, listing details and orders opened in a browser in Phase 8 |
+| 7. Chapa test payments | Complete. One order paid in Chapa TEST mode and verified by the server. Both order screens showed it in Phase 8. The pay button was not pressed again |
+| 8. End-to-end verification and handoff | Complete. Checks re-run, screens opened, handoff written |
 
 ## Implemented changes
 
@@ -200,21 +201,18 @@ now has 498 kg. Every other order is unpaid. New optional names: backend
 
 ## Uncommitted task-owned files
 
-None after the Phase 7 commit.
+None after the Phase 8 commit.
 
 ## Exact next action
 
-Wait for the instruction to start Phase 8. The budget is used up, so keep
-it to verification and the handoff document. On `feat/hackathon-lot-to-order`:
+Sprint complete. No further phase. Do not merge and do not deploy.
+The handoff is `docs/BUNALENS_SPRINT.md`. Demo: `npx expo start --web --port 8082`.
 
-1. Open the app in a browser once with the demo seller and the demo buyer:
-   lot screen (warehouse, screening, eligibility, listing cards), Market tab,
-   listing details, orders. None of these screens has been seen rendered.
-2. Write `docs/BUNALENS_SPRINT.md` from the phase records, with the
-   verification table and the three-minute walkthrough.
-3. Final commit and push. No merge, no deployment.
+Left unfinished, on purpose:
 
-Run order for the demo data: `verify-device-ingestion.mjs`,
-`verify-photo-screening.mjs`, `verify-eligibility.mjs`,
-`verify-marketplace.mjs`. `verify-order-payment.mjs` needs the function
-served locally; see `docs/ORDER_PAYMENTS.md`.
+- Live Gemini scan and `coffee-sync` from this checkout (no `GEMINI_API_KEY`; the local function container serves an older directory).
+- Model training (`ml/train_mobilenetv3_small.py` has never been run).
+- Screens for registering a lot, recording measurements, and reviewer decisions.
+- A failed or cancelled payment produced on Chapa itself.
+- Station-credit checkout, not exercised.
+- Six sprint migrations, pending on hosted production.

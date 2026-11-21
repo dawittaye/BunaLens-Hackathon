@@ -8,7 +8,8 @@ Read `docs/SPRINT_RULES.md` before continuing. Supporting records:
 `docs/PHOTO_SCREENING.md` (screening record, dataset inspection, what ran)
 `docs/ELIGIBILITY.md` (demo policy, exact rules, demo cases, checks),
 `docs/MARKETPLACE.md` (routes, functions, order states, stock, checks) and
-`docs/ORDER_PAYMENTS.md` (Chapa test payment, rules, what ran), and`ndocs/BUNALENS_SPRINT.md` (handoff: journey, walkthrough, verification). No secret
+`docs/ORDER_PAYMENTS.md` (Chapa test payment, rules, what ran), and
+`docs/BUNALENS_SPRINT.md` (handoff: journey, walkthrough, verification). No secret
 values belong in this file.
 
 ## Time

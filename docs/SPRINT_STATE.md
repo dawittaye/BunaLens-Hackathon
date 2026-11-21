@@ -1,12 +1,13 @@
 # BunaLens Sprint State
 
-Last updated: 2026-11-21T14:50+03:00, end of Phase 5.
+Last updated: 2026-11-21T15:01+03:00, end of Phase 6.
 
 Read `docs/SPRINT_RULES.md` before continuing. Supporting records:
 `docs/FOUNDATION.md` (audit, schema, configuration),
 `docs/DEVICE_INGESTION.md` (payload, replay, checks, limitations) and
 `docs/PHOTO_SCREENING.md` (screening record, dataset inspection, what ran)
-and `docs/ELIGIBILITY.md` (demo policy, exact rules, demo cases, checks). No secret
+`docs/ELIGIBILITY.md` (demo policy, exact rules, demo cases, checks) and
+`docs/MARKETPLACE.md` (routes, functions, order states, stock, checks). No secret
 values belong in this file.
 
 ## Time
@@ -20,9 +21,10 @@ values belong in this file.
 | Phase 3 active work | 13:55:35 to about 14:05, about 10 minutes (recorded as 11.5 before) |
 | Phase 4 active work | 14:22:48 to about 14:41, about 18 minutes. Over its share of the budget |
 | Phase 5 active work | 14:43 to about 14:50, about 8 minutes |
-| Elapsed active time | about 53 minutes |
-| Remaining budget | about 7 minutes for Phases 6 to 8. Not enough for them as specified |
-| Interruptions (not counted) | 13:38:12 to 13:42:25, 13:53:11 to 13:55:35, 14:05:17 to 14:22:48 and 14:41 to 14:43, waiting for phase instructions |
+| Phase 6 active work | 14:52 to about 15:01, about 10 minutes |
+| Elapsed active time | about 63 minutes. The 60-minute budget was passed during Phase 6, at about 14:59 |
+| Remaining budget | None. Phases 7 and 8 would be over budget |
+| Interruptions (not counted) | 13:38:12 to 13:42:25, 13:53:11 to 13:55:35, 14:05:17 to 14:22:48, 14:41 to 14:43 and 14:51 to 14:52, waiting for phase instructions |
 
 ## Repository
 
@@ -46,7 +48,7 @@ values belong in this file.
 | 3. Warehouse device ingestion and lot traceability | Complete, with simulated readings only |
 | 4. Photo screening and dataset experiment | Complete for the demo-fixture path. Live Gemini path written but not run. No model trained |
 | 5. Publication policy and reviewer workflow | Complete on the server with a DEMO policy and simulated readings. Lot-screen card not seen in a browser; no screens for readings or reviewer decisions |
-| 6. Marketplace and orders | Not started |
+| 6. Marketplace and orders | Complete on the server and verified through the HTTP API, including concurrent acceptance. Screens written, type-checked and bundled, not opened in a browser |
 | 7. Chapa test payments | Not started |
 | 8. End-to-end verification and handoff | Not started |
 
@@ -81,6 +83,12 @@ Everything not listed here is imported and unchanged.
 | Eligibility card and data access; card added to the lot screen | `components/LotEligibilityCard.tsx`, `services/lots.ts`, `app/batch/[id].tsx` | 5 |
 | Phase 5 checks and demo cases | `scripts/hackathon/verify-eligibility.mjs` | 5 |
 | Rules, demo cases and check record | `docs/ELIGIBILITY.md` | 5 |
+| Listing and order functions; listing provenance and order snapshot columns | `supabase/migrations/20261121145500_hackathon_marketplace_orders.sql` | 6 |
+| Marketplace data access | `services/marketplace.ts` | 6 |
+| Browse tab, listing details and order, orders screen | `app/(tabs)/marketplace.tsx`, `app/market/[id].tsx`, `app/market/orders.tsx` | 6 |
+| "Market" tab added (imported file, modified); seller listing card on the lot screen | `app/(tabs)/_layout.tsx`, `components/LotListingCard.tsx`, `app/batch/[id].tsx` | 6 |
+| Phase 6 checks and demo listings | `scripts/hackathon/verify-marketplace.mjs` | 6 |
+| Routes, states, stock and check record | `docs/MARKETPLACE.md` | 6 |
 
 ## Checks actually run
 
@@ -98,7 +106,9 @@ Everything not listed here is imported and unchanged.
 | `npm run typecheck`, `npx expo export --platform web` | local | Both passed after the Phase 4 client changes |
 | `node scripts/hackathon/verify-eligibility.mjs`, 49 checks with seller, reviewer and administrator sessions | local test stack, HTTP API | All passed, run twice. Role setup and listing writes use the local service role and are marked in the script |
 | `npm run typecheck` after the Phase 5 client changes | local | Passed |
-| Screening card, eligibility card and scan-from-lot in a browser | — | Not run in Phase 4 or 5 |
+| `node scripts/hackathon/verify-marketplace.mjs`, 59 checks with two sellers and two buyers, normal sessions only | local test stack, HTTP API | All passed: 58 of 58 on the first run; 59 of 59 on three further runs, after one check was added and the order checks were moved to a lot created per run. Includes six parallel acceptances against 300 kg: three accepted, never above stock |
+| `npm run typecheck` and `npx expo export --platform web` after the Phase 6 client changes | local | Both passed |
+| Any Phase 4, 5 or 6 screen in a browser | — | Not run |
 | `python ml/inspect_datasets.py` | Kaggle public API | Ran; output in `ml/dataset_inspection.json` |
 | Model training | — | Not run. PyTorch is not installed |
 | `npx expo-doctor` | — | Not run |
@@ -108,8 +118,8 @@ Everything not listed here is imported and unchanged.
 
 | Environment | State |
 |---|---|
-| Local test stack `bunalens-db-test-20261118-165455` | Base schema, nine imported migrations and all four sprint migrations applied with `psql`. No CLI migration history table |
-| Hosted production | Nothing applied, nothing written. All four sprint migrations and the two modified functions are pending there and must stay pending during the sprint |
+| Local test stack `bunalens-db-test-20261118-165455` | Base schema, nine imported migrations and all five sprint migrations applied with `psql`. No CLI migration history table |
+| Hosted production | Nothing applied, nothing written. All five sprint migrations and the two modified functions are pending there and must stay pending during the sprint |
 
 Ignored files in the checkout: `.env` (local stack), `.env.hosted`,
 `.env.backend`, `supabase/functions/.env`. Phase 3 added these names to
@@ -129,7 +139,12 @@ case lots (pass BNL-JMA-0688, fail BNL-JMA-A8E5, manual review BNL-JMA-7687)
 with SIMULATED readings, one published DEMO listing for the pass lot, the
 demo seller approved by the demo administrator, and check lots from two runs.
 New names in `.env.backend`: `BUNALENS_DEMO_REVIEWER_PASSWORD`,
-`BUNALENS_DEMO_ADMIN_PASSWORD`.
+`BUNALENS_DEMO_ADMIN_PASSWORD`. Phase 6 added accounts
+`demo-buyer@bunalens.test` and `demo-buyer-b@bunalens.test`
+(`BUNALENS_DEMO_BUYER_PASSWORD`, `BUNALENS_DEMO_BUYER_B_PASSWORD`), both demo
+sellers approved, three published DEMO listings (BNL-JMA-0688 500 kg at 450,
+BNL-JMA-B7E4 400 kg at 520, BNL-JMA-6D1D 800 kg at 38 ETB per kg), and demo
+orders from the verification runs, all unpaid.
 
 ## Live versus simulated integrations
 
@@ -142,7 +157,7 @@ New names in `.env.backend`: `BUNALENS_DEMO_REVIEWER_PASSWORD`,
 | Photo assessment on a lot | DEMO FIXTURE only, saved through the local stack. No photo has been analysed by a model |
 | Chapa | Code imported, not exercised. A test-mode key is configured for local functions |
 | Publication eligibility | Live on the local stack under a DEMO policy. Every reading is SIMULATED; no instrument was used |
-| Marketplace and orders | Tables and rules only. Publication rules enforced in the database. No seller publish function, no screens, no orders |
+| Marketplace and orders | Live on the local stack through the HTTP API. All listings are DEMO with simulated evidence. No order has a payment |
 | Dataset and trained model | Six datasets inspected from listings. No model trained, none integrated |
 
 ## Blockers and open items
@@ -165,23 +180,23 @@ New names in `.env.backend`: `BUNALENS_DEMO_REVIEWER_PASSWORD`,
 
 ## Uncommitted task-owned files
 
-None after the Phase 5 commit.
+None after the Phase 6 commit.
 
 ## Exact next action
 
-Wait for the instruction to start Phase 6. About 7 minutes of budget remain,
-so agree the cut first. Then, on `feat/hackathon-lot-to-order`:
+Wait for the instruction to start Phase 7. The 60-minute budget is used up,
+so confirm whether to continue. Then, on `feat/hackathon-lot-to-order`:
 
-1. Add the seller functions: create or update a listing for an eligible lot
-   and publish it explicitly (the database already refuses anything else).
-2. Add the buyer order function (quantity check, idempotency key, stock not
-   exceeded on acceptance) and the seller accept function.
-3. Add the smallest browse and order screens over the public listing read.
-4. Open the lot screen in a browser once; the Phase 4 and 5 cards have not
-   been seen rendered.
+1. Solve blocker 4 first: serve this checkout's Edge Functions against the
+   local stack. Without it no Chapa call can be exercised.
+2. Add a separate order-payment function and webhook path that write
+   `coffee_order_payments` and set `coffee_orders.payment_status`, in test
+   mode only, leaving the station-credit checkout untouched.
+3. If a test payment cannot be completed and verified, keep every order
+   "not paid" and say so.
+4. Open the lot, marketplace, listing and orders screens in a browser once.
+   None of the Phase 4, 5 or 6 screens has been seen rendered.
 
-Note for Phase 5 readers: the earlier plan said a demo-fixture screening must
-never pass by rule alone. The demo policy accepts simulated evidence so that
-a pass case can be shown without a model key; such decisions are flagged and
-their listings are forced to demo. A policy with
-`accept_simulated_evidence = false` sends them to manual review.
+Run order for the demo data: `verify-device-ingestion.mjs`,
+`verify-photo-screening.mjs`, `verify-eligibility.mjs`,
+`verify-marketplace.mjs`.

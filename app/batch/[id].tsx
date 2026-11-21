@@ -3,6 +3,7 @@ import { ScrollView, Text, View, Pressable, Image, Animated, Easing, Platform, A
 import LotEnvironmentCard from '@/components/LotEnvironmentCard';
 import LotScreeningCard from '@/components/LotScreeningCard';
 import LotEligibilityCard from '@/components/LotEligibilityCard';
+import LotListingCard from '@/components/LotListingCard';
 import { fetchCloudLot } from '@/services/lots';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useStation } from '@/contexts/StationContext';
@@ -185,6 +186,7 @@ export default function Detail() {
         </Pressable>
       ) : null}
       {batch.id.startsWith('lot_') ? <LotEligibilityCard batchId={batch.id} /> : null}
+      {batch.id.startsWith('lot_') ? <LotListingCard batchId={batch.id} lotWeightKg={batch.lot_weight_kg} /> : null}
       <LotEnvironmentCard batchId={batch.id} />
 
       <View className="border p-5 rounded-3xl mt-4" style={{ backgroundColor: theme.colors.surface, borderColor: theme.colors.line }}>

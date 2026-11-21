@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, ScanLine, Layers3, Warehouse } from 'lucide-react-native';
+import { Home, ScanLine, Layers3, Warehouse, Store } from 'lucide-react-native';
 import { View, Text } from 'react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -55,6 +55,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ tabBarAccessibilityLabel: 'Home', tabBarIcon: ({ focused }) => <TabItem icon={Home} label={t('home')} focused={focused} /> }} />
       <Tabs.Screen name="scan" options={{ tabBarAccessibilityLabel: t('scan'), tabBarIcon: () => <TabItem icon={ScanLine} label={t('scan')} focused accent /> }} />
       <Tabs.Screen name="batches" options={{ tabBarAccessibilityLabel: 'Batch history', tabBarIcon: ({ focused }) => <TabItem icon={Layers3} label={t('batches')} focused={focused} /> }} />
+      <Tabs.Screen name="marketplace" options={{ tabBarAccessibilityLabel: 'Coffee marketplace', tabBarIcon: ({ focused }) => <TabItem icon={Store} label="Market" focused={focused} /> }} />
       <Tabs.Screen name="station" options={{ tabBarAccessibilityLabel: 'Washing station', tabBarIcon: ({ focused }) => <TabItem icon={Warehouse} label={t('station')} focused={focused} /> }} />
     </Tabs>
   );

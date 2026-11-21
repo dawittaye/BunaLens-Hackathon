@@ -113,6 +113,15 @@ client configuration.
    this repository. They were not copied here. Consider rotating them and
    moving them to an ignored environment file.
 
+## In progress (Phase 2, 13:49)
+
+About to apply repo migrations `20261118145504`, `20261119120000`,
+`20261119140000` and the new sprint migration
+`20261121134500_hackathon_lot_to_order_foundation.sql` to the LOCAL Docker
+Supabase stack `bunalens-db-test-20261118-165455` (ports 54321 / 54322). A
+`pg_dump` backup is taken first and kept outside Git. The hosted project is
+not written to.
+
 ## Uncommitted task-owned files
 
 None after the Phase 1 commit.

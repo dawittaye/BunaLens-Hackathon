@@ -1,0 +1,16 @@
+project_id = "YOUR_SUPABASE_PROJECT_REF"
+
+[functions.gemini-grade]
+verify_jwt = true
+
+[functions.coffee-sync]
+verify_jwt = true
+
+[functions.chapa-initialize]
+verify_jwt = true
+
+[functions.chapa-webhook]
+verify_jwt = false
+
+[functions.certificate-verify]
+verify_jwt = false

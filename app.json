@@ -1,0 +1,66 @@
+
+{
+  "expo": {
+    "name": "BunaLens",
+    "slug": "bunalense",
+    "scheme": "bunalens",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "BunaLens uses your camera to inspect coffee samples.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Select a coffee sample image to grade."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Tag coffee batches with their washing station location."
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.newaznezif.bunalens"
+    },
+    "android": {
+      "package": "com.newaznezif.bunalens",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./logo.png"
+    },
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1c1a272c-5fd8-41df-9a5d-7ffee55ff65d"
+      }
+    },
+    "owner": "newazns-team"
+  }
+}

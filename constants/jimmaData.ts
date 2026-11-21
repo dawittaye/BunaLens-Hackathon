@@ -1,0 +1,1 @@
+export const JIMMA_WOREDAS=['Gomma','Limmu Kossa','Mana','Seka Chekorsa','Gera','Kersa','Jimma Town'];export const PRICE_BENCHMARKS={red_cherry:{min:4200,max:5600},green_bean:{min:5200,max:6900}};

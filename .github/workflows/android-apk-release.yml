@@ -1,0 +1,78 @@
+name: BunaLens Android APK Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bunalens-android-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish-apk:
+    name: Build and publish latest Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+
+      - name: Build Android APK with EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Missing EXPO_TOKEN repository secret. Add an Expo access token in GitHub Actions secrets."
+            exit 1
+          fi
+          eas build --platform android --profile preview --non-interactive --wait --json > build-result.json
+          BUILD_ID=$(node -e "const d=JSON.parse(require('fs').readFileSync('build-result.json','utf8')); const b=Array.isArray(d)?d[0]:d; if(!b.id) process.exit(2); process.stdout.write(b.id)")
+          echo "BUILD_ID=$BUILD_ID" >> "$GITHUB_ENV"
+
+      - name: Download completed APK
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          mkdir -p dist
+          cd dist
+          eas build:download --build-id "$BUILD_ID" --non-interactive
+          APK=$(find . -maxdepth 1 -type f -name '*.apk' -print -quit)
+          if [ -z "$APK" ]; then
+            echo "::error::EAS completed but no APK file was downloaded."
+            exit 1
+          fi
+          mv "$APK" BunaLens-latest.apk
+          test -s BunaLens-latest.apk
+
+      - name: Publish or update rolling Android release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: BunaLens Android — Latest
+          body: |
+            This release is automatically refreshed after changes are pushed to the main branch.
+
+            Download **BunaLens-latest.apk** and install it on an Android device. If BunaLens is already installed, install the newer APK over the existing version to update it. Your account and cloud data remain in the shared Supabase backend.
+
+            Native dependency, permission, or Android configuration changes require a newly built APK; this workflow creates one for each push to main.
+          prerelease: true
+          make_latest: true
+          files: dist/BunaLens-latest.apk
+          overwrite_files: true
+          fail_on_unmatched_files: true

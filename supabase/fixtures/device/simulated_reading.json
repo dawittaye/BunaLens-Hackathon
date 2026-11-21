@@ -1,0 +1,12 @@
+{
+  "_label": "SIMULATED FIXTURE. Not a measurement from a real sensor. Values were typed by hand for the hackathon demo.",
+  "_usage": "node scripts/hackathon/replay-device-reading.mjs",
+  "p_device_uid": "esp32-sim-zone-a",
+  "p_message_id": "sim-zone-a-000001",
+  "p_recorded_at": "NOW",
+  "p_temperature_c": 22.4,
+  "p_temperature_unit": "C",
+  "p_humidity_pct": 61.5,
+  "p_humidity_unit": "%RH",
+  "p_source": "simulated"
+}

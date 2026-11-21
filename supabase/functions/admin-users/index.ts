@@ -56,7 +56,8 @@ Deno.serve(async (req) => {
         event_type: "admin_action",
         metadata: { action, target_user_id: targetId },
       });
-      return reply({ success: true, userId: targetId, banned_until: updated.user.banned_until ?? null });
+      const bannedUntil = (updated.user as typeof updated.user & { banned_until?: string | null }).banned_until ?? null;
+      return reply({ success: true, userId: targetId, banned_until: bannedUntil });
     }
 
     if (action !== "list") return reply({ error: "Unsupported action" }, 400);

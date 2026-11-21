@@ -109,6 +109,55 @@ export async function attachDemoAssessment(
   if (error) throw new Error(error.message);
 }
 
+/** One input of the listing rules, with the evidence it was judged on. */
+export interface EligibilityCheck {
+  input: 'defect_pct' | 'bean_moisture_pct' | 'screen_size' | 'visible_damage_pct';
+  label: string;
+  status: 'pass' | 'fail' | 'manual_review' | 'not_applicable';
+  reason: string;
+  value?: number;
+  unit?: string;
+  method?: string;
+  source?: 'measured' | 'visually_estimated' | 'reviewer_entered' | 'simulated' | 'missing';
+  recorded_at?: string;
+  verification_status?: 'unverified' | 'verified' | 'rejected';
+}
+
+export interface LotEligibility {
+  eligibility_status: 'unreviewed' | 'eligible' | 'rejected' | 'needs_review';
+  current_rule_result: {
+    outcome: 'pass' | 'fail' | 'manual_review';
+    reasons: string[];
+    checks: EligibilityCheck[];
+    policy: { id: string; label: string; is_demo: boolean };
+    uses_simulated_evidence: boolean;
+    official_grade: 'Unclassified';
+  };
+  last_decision: {
+    decision: 'eligible' | 'rejected' | 'needs_review';
+    decided_by: 'rule' | 'reviewer';
+    reason: string;
+    policy_id: string | null;
+    is_override: boolean;
+    decided_at: string;
+    matches_current_evidence: boolean;
+  } | null;
+}
+
+export async function fetchLotEligibility(batchId: string): Promise<LotEligibility> {
+  if (!supabase) throw new Error('Connect a station account to see listing eligibility.');
+  const { data, error } = await supabase.rpc('bunalens_lot_eligibility', { p_batch_id: batchId });
+  if (error) throw new Error(error.message);
+  return data as LotEligibility;
+}
+
+/** Applies the server-side listing rules to the lot and records the decision. */
+export async function evaluateLotEligibility(batchId: string): Promise<void> {
+  if (!supabase) throw new Error('Connect a station account to evaluate a lot.');
+  const { error } = await supabase.rpc('bunalens_evaluate_lot_eligibility', { p_batch_id: batchId });
+  if (error) throw new Error(error.message);
+}
+
 export async function fetchLotEnvironment(batchId: string): Promise<LotEnvironment> {
   if (!supabase) throw new Error('Connect a station account to see warehouse readings.');
   const { data, error } = await supabase.rpc('bunalens_lot_environment', { p_batch_id: batchId });

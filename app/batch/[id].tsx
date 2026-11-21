@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { ScrollView, Text, View, Pressable, Image, Animated, Easing, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ScrollView, Text, View, Pressable, Image, Animated, Easing, Platform, ActivityIndicator } from 'react-native';
+import LotEnvironmentCard from '@/components/LotEnvironmentCard';
+import { fetchCloudLot } from '@/services/lots';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useStation } from '@/contexts/StationContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -55,7 +57,21 @@ export default function Detail() {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const cert = useRef<View>(null);
-  const batch = batches.find((item) => item.id === id);
+  const localBatch = batches.find((item) => item.id === id);
+  // A lot registered at the station may not be in this device's local
+  // history, so fall back to the cloud record the signed-in account can read.
+  const [cloudBatch, setCloudBatch] = useState<CoffeeBatch | null>(null);
+  const [cloudLoading, setCloudLoading] = useState(false);
+  useEffect(() => {
+    if (localBatch || !id) return;
+    let active = true;
+    setCloudLoading(true);
+    fetchCloudLot(id)
+      .then((found) => { if (active) setCloudBatch(found); })
+      .finally(() => { if (active) setCloudLoading(false); });
+    return () => { active = false; };
+  }, [id, localBatch]);
+  const batch = localBatch ?? cloudBatch;
   const captureCertificatePng = async (): Promise<string> => {
     if (!cert.current) throw new Error('The certificate is not ready.');
     if (Platform.OS === 'web') {
@@ -126,7 +142,7 @@ export default function Detail() {
     } catch (error) { showAlert(t('exportFailed'), error instanceof Error ? error.message : t('exportFailed')); }
   };
 
-  if (!batch) return <View className="flex-1 p-5" style={{ backgroundColor: theme.colors.parchment }}><Text onPress={() => router.back()}>{t('back')}</Text><Text>{t('batchNotFound')}</Text></View>;
+  if (!batch) return <View className="flex-1 p-5" style={{ backgroundColor: theme.colors.parchment }}><Text onPress={() => router.back()}>{t('back')}</Text>{cloudLoading ? <ActivityIndicator style={{ marginTop: 16 }} color="#7C2D12" /> : <Text>{t('batchNotFound')}</Text>}</View>;
 
   const result = batch.result;
   const pricing = batch.pricing;
@@ -150,7 +166,16 @@ export default function Detail() {
       </View>
       <Text className="text-espresso text-2xl font-black mt-4">{batch.batch_code}</Text>
       <Text className="text-stone-500 text-xs mt-1">Jimma Zone, Oromia · {batch.woreda} · {new Date(batch.created_at).toLocaleString()}</Text>
+      <Text testID="lot-id" className="text-stone-400 text-[10px] mt-1">Lot ID: {batch.id}</Text>
       {batch.image_uri ? <Image source={{ uri: batch.image_uri }} resizeMode="cover" style={{ width: '100%', height: 180, borderRadius: 18, marginTop: 16 }} /> : null}
+      {batch.status === 'queued' ? (
+        <View style={{ backgroundColor: '#FEF3C7', borderRadius: 12, padding: 12, marginTop: 12 }}>
+          <Text testID="lot-unassessed" style={{ color: '#92400E', fontSize: 12, fontWeight: '800' }}>No sample photo assessed yet</Text>
+          <Text style={{ color: '#92400E', fontSize: 11, marginTop: 4 }}>The quality figures below are placeholders until a photo of this lot is screened.</Text>
+        </View>
+      ) : null}
+
+      <LotEnvironmentCard batchId={batch.id} />
 
       <View className="border p-5 rounded-3xl mt-4" style={{ backgroundColor: theme.colors.surface, borderColor: theme.colors.line }}>
         <View className="flex-row justify-between items-start">

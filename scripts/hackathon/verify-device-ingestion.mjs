@@ -146,4 +146,4 @@ check('owner cannot read the stored token hash', hash.status === 403, 'HTTP ' + 
 
 console.log(failed === 0 ? '\nALL PHASE 3 CHECKS PASSED' : '\n' + failed + ' CHECK(S) FAILED');
 console.log('Demo lot id: ' + demoLotId + ' (open /batch/' + demoLotId + ' when signed in as demo-seller@bunalens.test)');
-process.exit(failed === 0 ? 0 : 1);
+process.exitCode = failed === 0 ? 0 : 1;

@@ -32,4 +32,4 @@ console.log('SIMULATED fixture: ' + fixture._label);
 console.log('Sending message ' + payload.p_message_id + ' from device ' + payload.p_device_uid + ' captured at ' + payload.p_recorded_at);
 const result = await rpc(stack, 'bunalens_ingest_device_reading', payload, { headers: { 'x-device-token': token } });
 console.log('HTTP ' + result.status + ' ' + JSON.stringify(result.json ?? result.text));
-process.exit(result.status === 200 ? 0 : 1);
+process.exitCode = result.status === 200 ? 0 : 1;

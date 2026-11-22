@@ -24,6 +24,22 @@ function validateAssessment(raw: unknown) {
   const v = raw as Record<string, unknown>;
   if (typeof v.is_coffee_sample !== "boolean") throw new Error("Missing sample classification.");
   if (v.rejection_reason !== undefined && typeof v.rejection_reason !== "string") throw new Error("Invalid rejection reason.");
+  if (v.is_coffee_sample === false) {
+    return {
+      is_coffee_sample: false,
+      rejection_reason: "This is not a coffee sample. Please scan a valid coffee sample.",
+      ecx_grade: "Unclassified",
+      quality_score: 0,
+      confidence_score: 0,
+      breakdown: { sound_or_ripe_pct: 0, unripe_green_pct: 0, black_overfermented_pct: 0, insect_broken_pct: 0, foreign_matter_pct: 0 },
+      estimated_price_per_feresula_etb: 0,
+      potential_gain_if_sorted_etb: 0,
+      export_readiness: "Insufficient Evidence",
+      sorting_action_advice: "No coffee assessment was performed because the image did not pass the coffee-only screening gate.",
+      assessment_limitations: ["Image rejected: the primary subject was not confidently identified as the selected coffee sample."],
+      assessment_method: "ai_visual_estimate" as const,
+    };
+  }
   if (!grades.includes(v.ecx_grade as typeof grades[number])) throw new Error("Unvalidated grade mapping is not permitted.");
   if (typeof v.quality_score !== "number" || !Number.isFinite(v.quality_score) || v.quality_score < 0 || v.quality_score > 100) throw new Error("Invalid quality score.");
   if (typeof v.confidence_score !== "number" || !Number.isFinite(v.confidence_score) || v.confidence_score < 0 || v.confidence_score > 100) throw new Error("Invalid confidence score.");
@@ -105,7 +121,7 @@ Deno.serve(async (req) => {
     const prompt = `You are BunaLens, a conservative visual coffee-sample screening assistant with contextual knowledge of Ethiopian Arabica production and Jimma Zone origins. This is NOT official ECX grading and you are NOT an ECX Q-Grader. Analyze only what is directly visible in the submitted photograph.
 Sample type: ${sampleType}. Origin: ${woreda}, Jimma Zone, Ethiopia.
 ${sampleInstructions}
-First assess image suitability: focus/sharpness, lighting, glare/shadows, sample coverage, approximate visible sample size, overlap/crowding, and whether the image actually depicts the selected coffee type. If unrelated, set is_coffee_sample=false and give a short rejection_reason. If it is coffee but image quality or sample coverage is inadequate, keep is_coffee_sample=true, set ecx_grade="Unclassified", export_readiness="Insufficient Evidence", lower confidence_score, explain limitations, and do not overstate the percentages.
+MANDATORY COFFEE-ONLY GATE — perform this before any quality analysis. The PRIMARY subject must unmistakably be the selected coffee sample: red coffee cherries for red_cherry, or green coffee beans for green_bean. Reject the image (is_coffee_sample=false) when the primary subject is a person, face, body part, weapon or firearm, tool, phone, document, animal, vehicle, building, landscape, another crop/food, household object, or any other non-coffee object. Also reject images where coffee is absent, only incidental in the background, too small to identify, or the subject is ambiguous. Do not infer that an object is coffee from the user's selected sample type or surrounding text. A hand may appear only incidentally if the coffee sample itself is clearly the dominant subject. When uncertain whether the primary subject is the selected coffee sample, reject it rather than guessing. For every rejected image use this concise user-facing rejection_reason: 'This is not a coffee sample. Please scan a valid coffee sample.' Do not create a batch or consume scan credits for rejected images. Only after the image passes this gate, assess focus/sharpness, lighting, glare/shadows, sample coverage, approximate visible sample size, overlap/crowding and photo suitability. If coffee is unmistakably present but photo quality or sample coverage is inadequate, keep is_coffee_sample=true, set ecx_grade='Unclassified', export_readiness='Insufficient Evidence', lower confidence_score and explain limitations. If it is coffee but image quality or sample coverage is inadequate, keep is_coffee_sample=true, set ecx_grade="Unclassified", export_readiness="Insufficient Evidence", lower confidence_score, explain limitations, and do not overstate the percentages.
 Estimate five mutually exclusive visible composition percentages that sum to 100. State uncertainty. Do not infer moisture, water activity, cup quality, aroma, screen size, density, laboratory results, hidden defects, export compliance, or official grade. Do not invent prices, buyer offers or financial outcomes. Always set ecx_grade="Unclassified", estimated_price_per_feresula_etb=0 and potential_gain_if_sorted_etb=0 because no validated grading-to-price methodology is configured. Use "Insufficient Evidence" unless the visible image is genuinely clear; readiness is a cautious visual sorting cue only, not export approval.
 Optionally report photo_issues (any of: blurry, too_dark, glare, too_few_visible, overlapping, partial_view), apparent_size_variation (appears_uniform, appears_mixed or not_assessable; a relative visual impression only, never a measured or screen size), and up to four short visible_observations about visible damage, discolouration or cherry ripeness.
 Return only JSON. Include specific, actionable sorting_action_advice and an assessment_limitations array. assessment_method must be "ai_visual_estimate". confidence_score is 0-100.`;

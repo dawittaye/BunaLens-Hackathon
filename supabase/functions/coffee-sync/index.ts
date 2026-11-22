@@ -77,10 +77,10 @@ Deno.serve(async(req)=>{
   const lat=Number(body.gps_latitude),lng=Number(body.gps_longitude);
   const hasGps=Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180;
   const ext=mime==="image/png"?"png":mime==="image/webp"?"webp":"jpg";
-  const imagePath=stationId+"/"+(lot?lot.id+"-":"")+idempotencyKey+"."+ext;
+  const imagePath=stationId+"/server-captures/"+crypto.randomUUID()+"."+ext;
   const screening=buildScreening(result,sampleType,{source:"live_inference",provider:"google",model:typeof gradePayload.model==="string"?gradePayload.model:"not recorded",assessedAt:typeof gradePayload.assessed_at==="string"?gradePayload.assessed_at:new Date().toISOString(),captureKey:idempotencyKey});
   const stored={...result,screening};
-  const {error:uploadError}=await db.storage.from("coffee-samples").upload(imagePath,bytes,{contentType:mime,upsert:true});
+  const {error:uploadError}=await db.storage.from("coffee-samples").upload(imagePath,bytes,{contentType:mime,upsert:false});
   if(uploadError){console.error("Sample upload failed",uploadError);return reply({error:"Could not store the sample image. Retry synchronization."},503)}
   const {data:benchmark}=await db.from("market_benchmarks").select("id,min_etb_per_feresula,max_etb_per_feresula,source_label,effective_date,is_demo").eq("sample_type",sampleType).eq("ecx_style_grade",result.ecx_grade).eq("active",true).order("effective_date",{ascending:false}).limit(1).maybeSingle();
   let pricing:any=undefined;
@@ -90,6 +90,8 @@ Deno.serve(async(req)=>{
    const {data:updated,error:updateError}=await db.from("coffee_batches").update({
     image_path:imagePath,grading_result:stored,pricing_result:pricing||null,grading_status:"completed",is_demo:false,ecx_grade:"Unclassified",quality_score:result.quality_score,confidence_score:result.confidence_score,
     eligibility_status:"unreviewed",eligibility_updated_at:new Date().toISOString(),
+    certification_status:"pending_admin_review",certified_grade:null,quality_classification:null,
+    certification_origin_zone:null,certified_by:null,certified_at:null,certification_note:null,
     ...(hasGps?{gps_latitude:lat,gps_longitude:lng}:{})
    }).eq("id",lot.id).eq("station_id",stationId).select("*").single();
    if(updateError||!updated){

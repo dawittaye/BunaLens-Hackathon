@@ -18,6 +18,7 @@ import { localStack, api, rpc, ensureUser, ensureStation, root } from './lib.mjs
 
 const stack = localStack();
 const FN = process.env.BUNALENS_ORDER_PAYMENT_URL || 'http://127.0.0.1:8000';
+if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+(?:\/[^?#]*)?$/.test(FN)) throw new Error('Use a local order-payment endpoint.');
 const statePath = path.join(root, '.order-payment-check.json'); // ignored by Git; holds ids only
 const run = crypto.randomBytes(4).toString('hex');
 let failed = 0;
@@ -35,7 +36,7 @@ const call = async (user, body, method = 'POST', query = '') => {
 
 const sellerA = await ensureUser(stack, 'demo-seller@bunalens.test', 'BUNALENS_DEMO_SELLER_PASSWORD');
 const sellerB = await ensureUser(stack, 'demo-seller-b@bunalens.test', 'BUNALENS_DEMO_SELLER_B_PASSWORD');
-await ensureStation(stack, sellerA, 'DEMO Gomma Washing Station', 'Gomma');
+const sellerStation = await ensureStation(stack, sellerA, 'DEMO Gomma Washing Station', 'Gomma');
 const buyer = await ensureUser(stack, 'demo-buyer@bunalens.test', 'BUNALENS_DEMO_BUYER_PASSWORD');
 const buyerB = await ensureUser(stack, 'demo-buyer-b@bunalens.test', 'BUNALENS_DEMO_BUYER_B_PASSWORD');
 const orderRow = async (id) => (await api(stack, 'GET', '/rest/v1/coffee_orders?select=status,payment_status,total_etb,quantity_kg&id=eq.' + id, { token: buyer.token })).json[0];
@@ -58,8 +59,8 @@ if (process.argv.includes('--confirm')) {
   check('a paid order cannot be cancelled', (await rpc(stack, 'bunalens_cancel_order', { p_order_id: state.orderId, p_note: null }, { token: buyer.token })).status === 400);
 } else {
   // ---- Up to an open checkout -----------------------------------------------------
-  const listing = (await api(stack, 'GET', '/rest/v1/marketplace_listings?select=id,batch_code,available_kg,price_per_kg_etb&status=eq.published&coffee_stage=eq.green_bean&origin_woreda=eq.Gomma&order=price_per_kg_etb.asc&limit=1')).json[0];
-  if (!listing) throw new Error('Run scripts/hackathon/verify-marketplace.mjs first: no published demo listing.');
+  const listing = (await api(stack, 'GET', '/rest/v1/marketplace_listings?select=id,batch_code,available_kg,price_per_kg_etb&status=eq.published&coffee_stage=eq.green_bean&origin_woreda=eq.Gomma&station_id=eq.' + encodeURIComponent(sellerStation) + '&order=price_per_kg_etb.asc&limit=1')).json?.[0];
+  if (!listing) throw new Error('Run scripts/hackathon/verify-marketplace.mjs first: no published certified fixture for the local seller.');
   const submit = (kg, key) => rpc(stack, 'bunalens_submit_order', { p_listing_id: listing.id, p_quantity_kg: kg, p_idempotency_key: key, p_buyer_name: 'DEMO buyer (not a real person)', p_buyer_phone: null }, { token: buyer.token });
   const order = (await submit(2, 'pay-order-' + run)).json.order;
   const init = (user, key = 'pay-key-' + run) => call(user, { action: 'initialize', orderId: order.id, idempotencyKey: key });

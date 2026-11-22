@@ -1,5 +1,5 @@
 export type SampleType = 'red_cherry' | 'green_bean';
-export type EcxGrade = 'Grade 1' | 'Grade 2' | 'Grade 3' | 'Grade 4' | 'Undergrade' | 'Unclassified';
+export type EcxGrade = 'Grade 1' | 'Grade 2' | 'Grade 3' | 'Grade 4' | 'Grade 5' | 'Grade 6' | 'Grade 7' | 'Undergrade' | 'Unclassified';
 export type ExportReadiness = 'Specialty Export' | 'Commercial Export' | 'Local Market Only' | 'Reject / Re-sort' | 'Insufficient Evidence';
 
 export interface GradingBreakdown {

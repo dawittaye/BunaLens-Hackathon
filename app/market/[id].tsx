@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { fetchListing, orderStateLabel, submitOrder, type CoffeeOrder, type Listing } from '@/services/marketplace';
 
@@ -49,6 +49,7 @@ export default function ListingDetails() {
       <Text style={{ fontSize: 20, fontWeight: '900', color: '#1C1917' }}>{listing.coffee_stage === 'red_cherry' ? 'Red cherries' : 'Green beans'} · {listing.origin_woreda}</Text>
       <Text style={{ fontSize: 13, color: '#44403C', marginTop: 4 }}>{listing.seller_display_name}</Text>
       <Text testID="listing-lot" style={{ fontSize: 12, color: '#57534E', marginTop: 2 }}>Lot {listing.batch_code} · Lot ID {listing.batch_id}</Text>
+      {listing.image_url ? <Image testID="listing-coffee-photo" source={{ uri: listing.image_url }} accessibilityLabel={'Coffee sample photograph for lot ' + listing.batch_code} resizeMode="contain" style={{ width: '100%', height: 230, borderRadius: 14, backgroundColor: '#F3F0EA', marginTop: 12 }} /> : <View testID="listing-photo-unavailable" style={{ width: '100%', height: 100, borderRadius: 14, backgroundColor: '#F3F0EA', marginTop: 12, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#78716C', fontSize: 11 }}>Coffee photograph unavailable</Text></View>}
       {listing.is_demo ? <Text style={{ marginTop: 8, fontSize: 11, fontWeight: '800', color: '#92400E', backgroundColor: '#FFFBEB', borderRadius: 8, padding: 8 }}>DEMO DATA — this listing rests on simulated evidence. It is not a real lot.</Text> : null}
       <View style={{ flexDirection: 'row', marginTop: 12, gap: 10 }}>
         <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#E7E5E4' }}><Text style={{ fontSize: 11, color: '#57534E' }}>Price</Text><Text testID="listing-price" style={{ fontSize: 17, fontWeight: '900', color: '#166534' }}>{listing.price_per_kg_etb.toLocaleString()} ETB/kg</Text></View>

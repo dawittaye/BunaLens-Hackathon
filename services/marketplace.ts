@@ -20,6 +20,7 @@ export interface Listing {
   id: string;
   batch_id: string;
   batch_code: string | null;
+  image_url?: string | null;
   station_id: string;
   seller_display_name: string;
   origin_woreda: string;
@@ -70,23 +71,33 @@ const client = () => {
   return supabase;
 };
 
+type ListingWithPhoto = Listing & { coffee_batches?: { image_path: string | null } | { image_path: string | null }[] | null };
+
+async function attachListingPhoto(row: ListingWithPhoto): Promise<Listing> {
+  const batch = Array.isArray(row.coffee_batches) ? row.coffee_batches[0] : row.coffee_batches;
+  const path = batch?.image_path;
+  if (!path) return { ...row, image_url: null };
+  const { data, error } = await client().storage.from('coffee-samples').createSignedUrl(path, 60 * 60);
+  return { ...row, image_url: error ? null : (data?.signedUrl ?? null) };
+}
+
 /** Published listings only. The filters run on the server. */
 export async function fetchListings(filters: ListingFilters = {}): Promise<Listing[]> {
-  let query = client().from('marketplace_listings').select('*').eq('status', 'published');
+  let query = client().from('marketplace_listings').select('*,coffee_batches!marketplace_listings_batch_id_fkey(image_path)').eq('status', 'published');
   if (filters.origin) query = query.eq('origin_woreda', filters.origin);
   if (filters.stage) query = query.eq('coffee_stage', filters.stage);
   if (filters.minPrice !== undefined) query = query.gte('price_per_kg_etb', filters.minPrice);
   if (filters.maxPrice !== undefined) query = query.lte('price_per_kg_etb', filters.maxPrice);
   const { data, error } = await query.order('price_per_kg_etb', { ascending: true });
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => ({ ...row, available_kg: Number(row.available_kg), price_per_kg_etb: Number(row.price_per_kg_etb) })) as Listing[];
+  return await Promise.all((data ?? []).map((row) => attachListingPhoto({ ...row, available_kg: Number(row.available_kg), price_per_kg_etb: Number(row.price_per_kg_etb) } as ListingWithPhoto)));
 }
 
 /** One listing the caller may read: published for everyone, any state for its own station. */
 export async function fetchListing(id: string): Promise<Listing | null> {
-  const { data, error } = await client().from('marketplace_listings').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await client().from('marketplace_listings').select('*,coffee_batches!marketplace_listings_batch_id_fkey(image_path)').eq('id', id).maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? ({ ...data, available_kg: Number(data.available_kg), price_per_kg_etb: Number(data.price_per_kg_etb) } as Listing) : null;
+  return data ? await attachListingPhoto({ ...data, available_kg: Number(data.available_kg), price_per_kg_etb: Number(data.price_per_kg_etb) } as ListingWithPhoto) : null;
 }
 
 export async function fetchListingForLot(batchId: string): Promise<Listing | null> {

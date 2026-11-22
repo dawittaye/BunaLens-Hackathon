@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useWin
 import type { ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import {
-  Activity, Building2, CheckCircle2, ChevronRight, CircleAlert, Coffee, CreditCard,
+  Activity, Building2, CheckCircle2, ChevronRight, CircleAlert, Coffee, CreditCard, FileText,
   Database, LayoutDashboard, LogOut, RefreshCw, Search, ShieldCheck, Sprout, TrendingUp, Users, ClipboardCheck,
 } from 'lucide-react-native';
 import { isSupabaseConfigured, supabase } from '@/services/supabaseClient';
@@ -11,8 +11,9 @@ import { useTheme } from '@/contexts/ThemeContext';
 import DirectoryManager from '@/components/admin/DirectoryManager';
 import UserManagement from '@/components/admin/UserManagement';
 import AdminScanReview from '@/components/admin/ScanReview';
+import ReportingAnalytics from '@/features/admin/ReportingAnalytics';
 
-type AdminTab = 'overview' | 'stations' | 'payments' | 'directory' | 'users' | 'reviews' | 'coffeePlants';
+type AdminTab = 'overview' | 'stations' | 'payments' | 'directory' | 'users' | 'reviews' | 'coffeePlants' | 'reporting';
 type StationRow = { id: string; name: string | null; manager: string | null; email: string | null; phone: string | null; woreda: string; credits: number; pro_expires_at: string | null; created_at: string };
 type BatchRow = { id: string; batch_code: string; sample_type: string; woreda: string; grading_status: string; ecx_grade: string; quality_score: number | null; created_at: string; stations?: { name: string | null; manager: string | null }[] | null };
 type PaymentRow = { id: string; package_id: string; amount_etb: number; currency: string; chapa_tx_ref: string; status: string; created_at: string; verified_at: string | null; stations?: { name: string | null }[] | null };
@@ -126,6 +127,7 @@ export default function AdminDashboard() {
     { key: 'users', label: 'Users', icon: Users },
     { key: 'reviews', label: 'Scan reviews', icon: ClipboardCheck },
     { key: 'coffeePlants', label: 'Coffee Plant Monitor', icon: Sprout },
+    { key: 'reporting', label: 'Reporting & Analytics', icon: FileText },
   ];
 
   return (
@@ -137,10 +139,10 @@ export default function AdminDashboard() {
           {narrow ? <Pressable onPress={() => void load(true)} accessibilityLabel="Refresh dashboard" style={{ padding: 10 }}><RefreshCw size={17} color="#FFFFFF" /></Pressable> : null}
         </View>
         {!narrow ? <Text style={{ color: '#9CAA9B', fontSize: 9, fontWeight: '900', letterSpacing: 1.3, marginHorizontal: 11, marginBottom: 10 }}>WORKSPACE</Text> : null}
-        <View style={{ flexDirection: narrow ? 'row' : 'column', gap: 5 }}>
+        <View style={{ flexDirection: narrow ? 'row' : 'column', flexWrap: narrow ? 'wrap' : 'nowrap', gap: 5 }}>
           {tabs.map(({ key, label, icon: Icon }) => {
             const selected = tab === key;
-            return <Pressable key={key} onPress={() => { if (key === 'coffeePlants') { router.push('/admin/coffee-plants'); return; } setTab(key); setSearch(''); }} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 11, borderRadius: 12, backgroundColor: selected ? '#3C5142' : 'transparent', flex: narrow ? 1 : undefined }}>
+            return <Pressable key={key} onPress={() => { if (key === 'coffeePlants') { router.push('/admin/coffee-plants'); return; } setTab(key); setSearch(''); }} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 11, borderRadius: 12, backgroundColor: selected ? '#3C5142' : 'transparent', flex: narrow ? 1 : undefined, minWidth: narrow ? 88 : undefined }}>
               <Icon size={16} color={selected ? '#FFFFFF' : '#AFB9AE'} /><Text style={{ color: selected ? '#FFFFFF' : '#AFB9AE', fontSize: 12, fontWeight: selected ? '800' : '600', marginLeft: 10 }}>{label}</Text>
             </Pressable>;
           })}
@@ -156,7 +158,7 @@ export default function AdminDashboard() {
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ width: '100%', maxWidth: 1500, alignSelf: 'center', padding: narrow ? 17 : 30, paddingBottom: 50 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
-          <View style={{ flex: 1 }}><Text style={{ color: theme.colors.secondary, fontSize: 11, fontWeight: '700' }}>BUNALENS / ADMIN</Text><Text style={{ color: theme.colors.espresso, fontSize: narrow ? 26 : 31, fontWeight: '900', letterSpacing: -0.8, marginTop: 5 }}>{tab === 'overview' ? 'Operations overview' : tab === 'stations' ? 'Coffee stations' : tab === 'payments' ? 'Payment activity' : tab === 'users' ? 'User management' : tab === 'reviews' ? 'Scan review queue' : 'Location directory'}</Text><Text style={{ color: theme.colors.secondary, fontSize: 12, marginTop: 4 }}>{tab === 'overview' ? 'A live view of the BunaLens network in Jimma.' : tab === 'stations' ? 'Station accounts registered across the network.' : tab === 'payments' ? 'Verified and pending station transactions.' : tab === 'users' ? 'Monitor every registered account, station association and user activity.' : tab === 'reviews' ? 'Review every submitted coffee scan and approve eligible lots for public marketplace publication.' : 'Manage woredas and the station options shown during registration.'}</Text></View>
+          <View style={{ flex: 1 }}><Text style={{ color: theme.colors.secondary, fontSize: 11, fontWeight: '700' }}>BUNALENS / ADMIN</Text><Text style={{ color: theme.colors.espresso, fontSize: narrow ? 26 : 31, fontWeight: '900', letterSpacing: -0.8, marginTop: 5 }}>{tab === 'overview' ? 'Operations overview' : tab === 'stations' ? 'Coffee stations' : tab === 'payments' ? 'Payment activity' : tab === 'users' ? 'User management' : tab === 'reviews' ? 'Scan review queue' : tab === 'reporting' ? 'Reporting & Analytics' : 'Location directory'}</Text><Text style={{ color: theme.colors.secondary, fontSize: 12, marginTop: 4 }}>{tab === 'overview' ? 'A live view of the BunaLens network in Jimma.' : tab === 'stations' ? 'Station accounts registered across the network.' : tab === 'payments' ? 'Verified and pending station transactions.' : tab === 'users' ? 'Monitor every registered account, station association and user activity.' : tab === 'reviews' ? 'Review every submitted coffee scan and approve eligible lots for public marketplace publication.' : tab === 'reporting' ? 'Generate and export live operational reports.' : 'Manage woredas and the station options shown during registration.'}</Text></View>
           {!narrow ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E9E0', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 8 }}><View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#55765D', marginRight: 7 }} /><Text style={{ color: '#55765D', fontSize: 10, fontWeight: '800' }}>LIVE DATA</Text></View>
             <Pressable onPress={() => void load(true)} disabled={refreshing} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#26372D', borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11 }}><RefreshCw size={14} color="#FFFFFF" /><Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>{refreshing ? 'Refreshing' : 'Refresh'}</Text></Pressable>
@@ -238,6 +240,7 @@ export default function AdminDashboard() {
           {tab === 'directory' ? <DirectoryManager /> : null}
           {tab === 'users' ? <UserManagement /> : null}
           {tab === 'reviews' ? <AdminScanReview /> : null}
+          {tab === 'reporting' ? <ReportingAnalytics /> : null}
         </>}
         <Text style={{ color: '#9AA298', fontSize: 9, lineHeight: 15, textAlign: 'center', marginTop: 24 }}>BunaLens provides preliminary visual screening only. Data excludes local demonstration records where indicated.</Text>
         {narrow ? <Pressable onPress={() => void signOut()} style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'center', padding: 15, marginTop: 4 }}><LogOut size={15} color="#727C70" /><Text style={{ color: '#727C70', fontSize: 11, fontWeight: '700', marginLeft: 8 }}>Sign out</Text></Pressable> : null}

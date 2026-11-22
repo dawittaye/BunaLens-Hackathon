@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Path, Polygon, Rect } from 'react-native-svg';
 import { router } from 'expo-router';
 import { ArrowLeft, Coffee, CreditCard, Database, Building2, ClipboardCheck, LayoutDashboard, LogOut, RefreshCw, Sprout, Thermometer, Wind, Droplets, Activity, Users } from 'lucide-react-native';
 import { supabase } from '@/services/supabaseClient';
+import CoffeeOriginMap from '@/components/CoffeeOriginMap';
 
 type Site = { id: string; name: string; short: string; lat: number; lon: number };
 type Point = { decimalLatitude: number; decimalLongitude: number; scientificName?: string; establishmentMeans?: string; basisOfRecord?: string; key?: number };
@@ -42,124 +43,14 @@ function Metric({ title, value, unit, status, detail, icon: Icon }: any) {
 function Status({ children, tone = GREEN }: any) {
   return <View style={{ backgroundColor: tone + '18', borderRadius: 99, paddingHorizontal: 9, paddingVertical: 5 }}><Text style={{ color: tone, fontSize: 9, fontWeight: '900' }}>{children}</Text></View>;
 }
-declare global {
-  interface Window { google?: any; }
-}
-function EthiopiaMap({ site, points, zoom, onToggle }: { site: Site; points: Point[]; zoom: boolean; onToggle: () => void }) {
-  const hostRef = React.useRef<any>(null);
-  const mapRef = React.useRef<any>(null);
-  const overlaysRef = React.useRef<any[]>([]);
-  const [mapError, setMapError] = useState('');
-  const [mapReady, setMapReady] = useState(false);
-  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-  useEffect(() => {
-    let active = true;
-    if (!apiKey) { setMapError('Google Maps API key is not configured. Add EXPO_PUBLIC_GOOGLE_MAPS_API_KEY to the Vercel production environment.'); return; }
-    const init = async () => {
-      try {
-        if (!window.google?.maps) {
-          const existing = document.querySelector('script[data-bunalens-google-maps="true"]') as HTMLScriptElement | null;
-          if (!existing) {
-            const script = document.createElement('script');
-            script.dataset.bunalensGoogleMaps = 'true';
-            script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(apiKey) + '&v=weekly';
-            script.async = true;
-            script.defer = true;
-            document.head.appendChild(script);
-            await new Promise<void>((resolve, reject) => { script.onload = () => resolve(); script.onerror = () => reject(new Error('Google Maps failed to load. Check API key, billing and HTTP referrer restrictions.')); });
-          } else if (!window.google?.maps) {
-            await new Promise<void>((resolve, reject) => { existing.addEventListener('load', () => resolve(), { once: true }); existing.addEventListener('error', () => reject(new Error('Google Maps failed to load.')), { once: true }); });
-          }
-        }
-        if (!active || !hostRef.current || !window.google?.maps) return;
-        const map = new window.google.maps.Map(hostRef.current, {
-          center: zoom ? { lat: 7.72, lng: 36.72 } : { lat: 9.15, lng: 40.49 },
-          zoom: zoom ? 9 : 6,
-          mapTypeId: 'roadmap',
-          streetViewControl: false,
-          mapTypeControl: true,
-          fullscreenControl: true,
-          clickableIcons: false,
-          gestureHandling: 'greedy',
-        });
-        mapRef.current = map;
-        const [countryMeta, jimmaMeta] = await Promise.all([
-          fetch('https://www.geoboundaries.org/api/current/gbOpen/ETH/ADM0/').then(r => { if (!r.ok) throw new Error('Ethiopia boundary metadata unavailable'); return r.json(); }),
-          fetch('https://www.geoboundaries.org/api/current/gbOpen/ETH/ADM2/').then(r => { if (!r.ok) throw new Error('Jimma Zone boundary metadata unavailable'); return r.json(); }),
-        ]);
-        const [countryGeo, adm2Geo] = await Promise.all([
-          fetch(countryMeta.simplifiedGeometryGeoJSON || countryMeta.gjDownloadURL).then(r => { if (!r.ok) throw new Error('Ethiopia GeoJSON unavailable'); return r.json(); }),
-          fetch(jimmaMeta.simplifiedGeometryGeoJSON || jimmaMeta.gjDownloadURL).then(r => { if (!r.ok) throw new Error('ADM2 GeoJSON unavailable'); return r.json(); }),
-        ]);
-        if (!active) return;
-        map.data.addGeoJson(countryGeo);
-        map.data.setStyle((feature: any) => ({
-          fillColor: '#D9E0D8', fillOpacity: 0.18, strokeColor: '#7D8A7D', strokeOpacity: 0.8, strokeWeight: 1,
-          zIndex: 1,
-        }));
-        const features = (adm2Geo.features || []).filter((feature: any) => {
-          const props = feature.properties || {};
-          const name = String(props.shapeName || props.ADM2_EN || props.name || props.shapeName_en || '').toLowerCase();
-          return name === 'jimma' || name === 'jimma zone' || name.includes('jimma');
-        });
-        if (!features.length) throw new Error('Jimma Zone was not found in the current Ethiopia ADM2 boundary dataset. The map will not substitute an approximate rectangle.');
-        const jimmaCollection = { type: 'FeatureCollection', features };
-        map.data.addGeoJson(jimmaCollection);
-        map.data.setStyle((feature: any) => {
-          const name = String(feature.getProperty('shapeName') || feature.getProperty('ADM2_EN') || feature.getProperty('name') || '').toLowerCase();
-          const isJimma = name.includes('jimma');
-          return isJimma
-            ? { fillColor: '#1F8A50', fillOpacity: 0.28, strokeColor: '#0B6B3A', strokeOpacity: 1, strokeWeight: 3, zIndex: 5 }
-            : { fillColor: '#D9E0D8', fillOpacity: 0.12, strokeColor: '#7D8A7D', strokeOpacity: 0.8, strokeWeight: 1, zIndex: 1 };
-        });
-        const info = new window.google.maps.InfoWindow();
-        const bounds = new window.google.maps.LatLngBounds();
-        const collect = (coords: any): void => {
-          if (!Array.isArray(coords)) return;
-          if (typeof coords[0] === 'number' && typeof coords[1] === 'number') { bounds.extend({ lat: coords[1], lng: coords[0] }); return; }
-          coords.forEach(collect);
-        };
-        features.forEach((feature: any) => collect(feature.geometry?.coordinates));
-        SITES.forEach(s => {
-          const marker = new window.google.maps.Marker({ map, position: { lat: s.lat, lng: s.lon }, title: s.name, label: { text: s.id === site.id ? '★' : '●', color: '#FFFFFF', fontSize: '12px' }, icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: s.id === site.id ? 9 : 7, fillColor: s.id === site.id ? '#A34F3E' : '#247849', fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2 } });
-          marker.addListener('click', () => { info.setContent('<strong>' + s.name + '</strong><br/>' + s.lat.toFixed(4) + ', ' + s.lon.toFixed(4)); info.open({ map, anchor: marker }); });
-          overlaysRef.current.push(marker);
-        });
-        points.slice(0, 300).forEach(p => {
-          const marker = new window.google.maps.Marker({ map, position: { lat: p.decimalLatitude, lng: p.decimalLongitude }, title: 'GBIF Coffea arabica · ' + (p.establishmentMeans || 'occurrence'), icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 3.5, fillColor: '#8B4D36', fillOpacity: 0.9, strokeColor: '#FFFFFF', strokeWeight: 1 } });
-          overlaysRef.current.push(marker);
-        });
-        if (zoom && !bounds.isEmpty()) map.fitBounds(bounds, 45);
-        if (!zoom) { map.setCenter({ lat: 9.15, lng: 40.49 }); map.setZoom(6); }
-        setMapReady(true);
-      } catch (error: any) {
-        if (active) setMapError(error?.message || 'Unable to load Google Maps and verified administrative boundaries.');
-      }
-    };
-    void init();
-    return () => { active = false; overlaysRef.current.forEach(marker => marker.setMap(null)); overlaysRef.current = []; mapRef.current = null; };
-  }, [apiKey, site.id, zoom, points]);
-  return <View style={{ ...panel, padding: 15, flex: 1, minWidth: 280 }}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-      <View style={{ flex: 1 }}><Text style={{ color: INK, fontSize: 15, fontWeight: '900' }}>Ethiopia Origin & Jimma Coffee Cluster</Text><Text style={{ color: MUTED, fontSize: 10, marginTop: 3 }}>Google Maps · real administrative boundary · live coffee coordinates</Text></View>
-      <Pressable onPress={onToggle} style={{ backgroundColor: '#26372D', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }}><Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '900' }}>{zoom ? 'Full Ethiopia View' : 'Zoom to Jimma'}</Text></Pressable>
-    </View>
-    <View ref={hostRef} style={{ width: '100%', height: 360, marginTop: 12, borderRadius: 12, overflow: 'hidden', backgroundColor: '#E9EEE8' }} />
-    {!mapReady ? <View style={{ padding: 12 }}><ActivityIndicator color={GREEN}/><Text style={{ color: mapError ? '#A34F3E' : MUTED, fontSize: 10, marginTop: 6 }}>{mapError || 'Loading Google Maps and official Jimma Zone boundary…'}</Text></View> : null}
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
-      <Text style={{ color: MUTED, fontSize: 9 }}>● Selected coffee site</Text><Text style={{ color: GREEN, fontSize: 9 }}>● Other coffee sites</Text><Text style={{ color: '#8B4D36', fontSize: 9 }}>● GBIF native occurrence</Text>
-    </View>
-    <Text style={{ color: MUTED, fontSize: 9, marginTop: 8, lineHeight: 14 }}>Google Maps road basemap with geoBoundaries Ethiopia ADM0 and ADM2 administrative polygons. Jimma is selected by its boundary name; no bounding-box substitute is used. Boundary data: geoBoundaries gbOpen (CC BY 4.0).</Text>
-  </View>;
-}
 export default function CoffeePlantMonitor() {
   const { width } = useWindowDimensions();
   const [siteId, setSiteId] = useState('jarc');
   const [data, setData] = useState<PlantData>({ errors: [] });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [zoom, setZoom] = useState(false);
-  const site = SITES.find(s => s.id === siteId) || SITES[0];
+  const [zoom, setZoom] = useState(true);
+  const site = SITES.find(s => s.id === siteId) ?? SITES[0]!;
   const load = useCallback(async (quiet = false) => {
     if (!supabase) return;
     if (quiet) setRefreshing(true); else setLoading(true);
@@ -187,7 +78,7 @@ export default function CoffeePlantMonitor() {
     }).catch(error=>setData(old=>({...old,errors:[...old.errors,String(error?.message||error)]})));});
     const settled = await Promise.allSettled(tasks);
     const errors:string[]=[];
-    settled.forEach((result,index)=>{if(result.status==='rejected')errors.push(keys[index]+': '+String(result.reason?.message||result.reason));});
+    settled.forEach((result,index)=>{if(result.status==='rejected')errors.push(keys[index]!+': '+String(result.reason?.message||result.reason));});
     const values = settled.map(result=>result.status==='fulfilled'?result.value:undefined);
     const records=(values[4]?.results||[]).filter((p:Point)=>Number.isFinite(p.decimalLatitude)&&Number.isFinite(p.decimalLongitude)&&p.establishmentMeans?.toUpperCase()==='NATIVE');
     setData({forecast:values[0],archive:values[1],nasa:values[2],soil:values[3],gbif:records,errors,fetchedAt:new Date().toISOString()});
@@ -257,7 +148,7 @@ export default function CoffeePlantMonitor() {
       </View>
       <View style={{...panel,padding:15,marginTop:15,borderLeftWidth:4,borderLeftColor:'#B7834D'}}><View style={{flexDirection:'row',alignItems:'center',gap:8}}><Activity size={17} color="#A36C34"/><Text style={{color:INK,fontSize:13,fontWeight:'900'}}>Phenological & bean-defect risk context</Text></View><Text style={{color:'#66533D',fontSize:11,lineHeight:18,marginTop:8}}>{alert}</Text><Text style={{color:MUTED,fontSize:9,marginTop:7}}>30-day rainfall: {fmt(rainfall,1)} mm · Days with Tmax above 28°C: {heatDays} · This is a screening alert, not a validated flowering/cherry-fill model and not a prediction of any batch's defects.</Text></View>
       <View style={{flexDirection:narrow?'column':'row',gap:13,marginTop:15,alignItems:'stretch'}}>
-        <EthiopiaMap site={site} points={data.gbif||[]} zoom={zoom} onToggle={()=>setZoom(v=>!v)}/>
+        <CoffeeOriginMap site={site} points={data.gbif||[]} zoom={zoom} onToggle={()=>setZoom(v=>!v)}/>
         <View style={{...panel,padding:15,flex:1.1,minWidth:280}}>
           <Text style={{color:INK,fontSize:15,fontWeight:'900'}}>7-day plant water balance</Text><Text style={{color:MUTED,fontSize:10,marginTop:4}}>Daily values from the selected Open-Meteo grid cell</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={{minWidth:490,marginTop:13}}>

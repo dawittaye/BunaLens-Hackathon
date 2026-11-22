@@ -24,6 +24,8 @@ jobs:
         run: npx expo-doctor
       - name: Export Android JavaScript bundle
         run: npx expo export --platform android
+      - name: Export web bundle
+        run: npx expo export --platform web
 
   validate-edge-functions:
     runs-on: ubuntu-latest
